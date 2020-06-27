@@ -21,6 +21,8 @@ class LoginError(RuntimeError):
 
 # noinspection PyShadowingBuiltins,PyAttributeOutsideInit
 class API:
+    __slots__ = 'url', 'session', 'maxlag', '_csrf_token',\
+        '_login_token', '_patrol_token', '_assertuser'
 
     def __init__(
         self, url: str, user_agent: str = None, maxlag: int = 5,
@@ -49,7 +51,7 @@ class API:
         Warn about warnings and raise errors as APIError.
         """
         debug('post data: %s', data)
-        data.update({
+        data |= {
             'format': 'json',
             'formatversion': '2',
             'errorformat': 'plaintext',
