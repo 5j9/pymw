@@ -25,7 +25,7 @@ setup(
     url='https://github.com/5j9/pymw',
     packages=['pymw'],
     python_requires='>=3.9',
-    install_requires=['requests'],
+    install_requires=['requests', 'tomlkit'],
     tests_require=['pytest'],
     classifiers=[
         'Development Status :: 1 - Planning',

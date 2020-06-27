@@ -13,6 +13,17 @@ Installation
 
     pip install pymw
 
+Usage
+-----
+To avoid providing username and password for each login create a ``.pymw.toml`` file in your home directory with the following content format:
+```
+# The configuration file for pymw python library.
+version = 1
+
+['https://test.wikipedia.org/w/api.php'.login]
+'<Username@Special:BotPasswords>' = '<BotPassword>'
+```
+
 Notable features
 ----------------
 - Supports setting a custom `User-Agent header`_ for each ``API`` instance.

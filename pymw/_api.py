@@ -2,9 +2,11 @@ from inspect import iscoroutinefunction
 from pprint import pformat
 from typing import Any
 from logging import warning, debug, info
+from pathlib import Path
+from time import sleep
 
 from requests import Session, Response
-from time import sleep
+from tomlkit import parse as toml_parse
 
 __version__ = '0.4.dev0'
 
@@ -153,11 +155,15 @@ class API:
     def login_token(self):
         self._login_token = None
 
-    def login(self, lgname: str, lgpassword: str, **kwargs: Any) -> None:
+    def login(
+        self, lgname: str = None, lgpassword: str = None, **kwargs: Any
+    ) -> None:
         """https://www.mediawiki.org/wiki/API:Login
 
         `lgtoken` will be added automatically.
         """
+        if lgpassword is None:
+            lgname, lgpassword = load_lgname_lgpass(self.url, lgname)
         json = self.post(
             action='login',
             lgname=lgname,
@@ -173,7 +179,7 @@ class API:
             info(result)
             del self._login_token
             return self.login(lgname, lgpassword, **kwargs)
-        raise LoginError(result)
+        raise LoginError(pformat(json['login']['reason']))
         # todo: store user and pass for relogin and assert username for now on
 
     def close(self) -> None:
@@ -321,3 +327,14 @@ class API:
             kwargs['rvlimit'] = 'max'
         for revisions in self.prop_query('revisions', **kwargs):
             yield revisions
+
+
+def load_lgname_lgpass(api_url, username=None):
+    with (Path('~').expanduser() / '.pymw.toml').open(
+        'r', encoding='utf8'
+    ) as f:
+        pymw_toml = f.read()
+    login = toml_parse(pymw_toml)[api_url]['login']
+    if username is None:
+        return *login.popitem(),
+    return username, login[username]
