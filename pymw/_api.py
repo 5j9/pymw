@@ -1,5 +1,5 @@
 from pprint import pformat
-from typing import Any
+from typing import Any, Optional
 from logging import warning, debug, info
 from pathlib import Path
 from time import sleep
@@ -8,6 +8,9 @@ from requests import Session, Response
 from tomlkit import parse as toml_parse
 
 __version__ = '0.4.dev0'
+
+
+PARSED_TOML: Optional[str] = None
 
 
 class APIError(RuntimeError):
@@ -336,11 +339,14 @@ class API:
 
 
 def load_lgname_lgpass(api_url, username=None):
-    with (Path('~').expanduser() / '.pymw.toml').open(
-        'r', encoding='utf8'
-    ) as f:
-        pymw_toml = f.read()
-    login = toml_parse(pymw_toml)[api_url]['login']
+    global PARSED_TOML
+    if PARSED_TOML is None:
+        with (Path('~').expanduser() / '.pymw.toml').open(
+            'r', encoding='utf8'
+        ) as f:
+            pymw_toml = f.read()
+        PARSED_TOML = toml_parse(pymw_toml)
+    login = PARSED_TOML[api_url]['login']
     if username is None:
         return *login.popitem(),
     return username, login[username]

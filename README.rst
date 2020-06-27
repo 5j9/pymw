@@ -15,7 +15,7 @@ Installation
 
 Usage
 -----
-To avoid providing username and password for each login create a ``.pymw.toml`` file in your home directory with the following content format:
+Create a ``.pymw.toml`` file in your home directory with the following content format to avoid directly providing username and password for login calls:
 ```
 # The configuration file for pymw python library.
 version = 1

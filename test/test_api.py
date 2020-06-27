@@ -1,9 +1,10 @@
 from dataclasses import dataclass
 from pprint import pformat
-from unittest.mock import patch
+from unittest.mock import patch, mock_open
+
+from pytest import fixture, raises
 
 from pymw import API, LoginError, APIError
-from pytest import fixture
 
 
 api = API('https://www.mediawiki.org/w/api.php')
@@ -260,3 +261,29 @@ def test_revisions_mode2_no_rvlimit(post_mock):  # auto set rvlimit
         {'ns': 0, 'pageid': 112963, 'revisions': [{'comment': '', 'minor': False, 'parentid': 438023, 'revid': 438026, 'timestamp': '2020-06-25T21:09:52Z', 'user': 'DMaza (WMF)'}, {'comment': '', 'minor': False, 'parentid': 438022, 'revid': 438023, 'timestamp': '2020-06-25T21:08:12Z', 'user': 'DMaza (WMF)'}, {'comment': '1', 'minor': False, 'parentid': 0, 'revid': 438022, 'timestamp': '2020-06-25T21:08:02Z', 'user': 'DMaza (WMF)'}], 'title': 'DmazaTest'}
     ] == [r for r in api.revisions(titles='DmazaTest', rvstart='now')]
     assert post_mock.mock_calls[0].kwargs == {'action': 'query', 'prop': 'revisions', 'titles': 'DmazaTest', 'rvstart': 'now', 'rvlimit': 'max'}
+
+
+pymw_toml = '''
+version = 1
+
+['https://www.mediawiki.org/w/api.php'.login]
+'username@toolname' = 'bot_password'
+'''
+pymw_toml_mock = mock_open(read_data=pymw_toml)
+
+
+@patch('pymw._api.Path.open', pymw_toml_mock)
+@api_post_patch({}, {})
+def test_login_config(post_mock):
+    post_call_kwargs = {
+        'action': 'login', 'lgname': 'username@toolname',
+        'lgpassword': 'bot_password', 'lgtoken': 'LOGIN_TOKEN'}
+    api.login_token = 'LOGIN_TOKEN'
+    with raises(KeyError):  # because of invalid api_post_patch response
+        api.login()  # without username
+    post_mock.assert_called_once_with(**post_call_kwargs)
+    with raises(KeyError):  # again, because of invalid api_post_patch response
+        api.login('username@toolname')  # without username
+    # note that assert_called_with only checks the last call
+    post_mock.assert_called_with(**post_call_kwargs)
+    pymw_toml_mock.assert_called_once()
