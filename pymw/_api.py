@@ -1,4 +1,3 @@
-from inspect import iscoroutinefunction
 from pprint import pformat
 from typing import Any
 from logging import warning, debug, info
@@ -71,14 +70,15 @@ class API:
     def _handle_api_errors(self, data: dict, resp: Response, json: dict):
         errors = json['errors']
         for error in errors:
-            handler = getattr(self, f'_handle_{error["code"]}_error', None)
-            if handler is not None:
-                if iscoroutinefunction(handler):
-                    handler_result = handler(resp, data, error)
-                else:
-                    handler_result = handler(resp, data, error)
-                if handler_result is not None:
-                    return handler_result
+            if (
+                handler := getattr(
+                    self, f'_handle_{error["code"]}_error', None)
+            ) is not None and (
+                handler_result := handler(resp, data, error)
+            ) is not None:
+                # https://youtrack.jetbrains.com/issue/PY-39262
+                # noinspection PyUnboundLocalVariable
+                return handler_result
         raise APIError(errors)
 
     def _handle_maxlag_error(
