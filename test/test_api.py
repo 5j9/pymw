@@ -207,7 +207,7 @@ def test_bad_patrol_token(_):
 def test_rawcontinue():
     try:
         for _ in api.query(rawcontinue=''):
-            pass
+            pass  # pragma: nocover
     except NotImplementedError:
         pass
     else:  # pragma: nocover
