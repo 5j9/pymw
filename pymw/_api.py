@@ -55,7 +55,9 @@ class API:
             'format': 'json',
             'formatversion': '2',
             'errorformat': 'plaintext',
-            'maxlag': self.maxlag})
+            'maxlag': self.maxlag}
+        if self._assertuser:
+            data['assertuser'] = self._assertuser
         resp = self.session.post(self.url, data=data)
         json = resp.json()
         debug('json response: %s', json)
@@ -181,8 +183,8 @@ class API:
             info(result)
             del self._login_token
             return self.login(lgname, lgpassword, **kwargs)
+        self._assertuser = lgname
         raise LoginError(pformat(json['login']['reason']))
-        # todo: store user and pass for relogin and assert username for now on
 
     def close(self) -> None:
         """Close the current API session."""
