@@ -9,20 +9,22 @@ Another personal pet project of mine. It requires Python 3.9+!
 
 Installation
 ------------
-.. code-block::
+.. code-block:: bash
 
     pip install pymw
 
 Usage
 -----
 Create a ``.pymw.toml`` file in your home directory with the following content format to avoid directly providing username and password for login calls:
-```
-# The configuration file for pymw python library.
-version = 1
 
-['https://test.wikipedia.org/w/api.php'.login]
-'<Username@Special:BotPasswords>' = '<BotPassword>'
-```
+.. code-block:: toml
+
+    # The configuration file for pymw python library.
+    version = 1
+
+    ['https://test.wikipedia.org/w/api.php'.login]
+    '<Username@Special:BotPasswords>' = '<BotPassword>'
+
 
 Notable features
 ----------------
