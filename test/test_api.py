@@ -3,9 +3,16 @@ from pprint import pformat
 from unittest.mock import patch
 
 from pymw import API, LoginError, APIError
+from pytest import fixture
 
 
 api = API('https://www.mediawiki.org/w/api.php')
+
+
+@fixture
+def cleared_api():
+    api.clear_cache()
+    return api
 
 
 def fake_sleep(_):
@@ -26,15 +33,12 @@ def patch_post(obj, attr, return_values):
         def fake_post_closure():
             return return_value
         return fake_post_closure()
-    fake_posts = []
-    fake_posts_append = fake_posts.append
-    for return_value in return_values:
-        fake_posts_append(fake_post(return_value))
-    return patch.object(obj, attr, side_effect=fake_posts)
+    return patch.object(
+        obj, attr, side_effect=[fake_post(rv) for rv in return_values])
 
 
 def api_post_patch(*return_values: dict):
-    return patch_post(api, 'post', return_values)
+    return patch_post(API, 'post', return_values)
 
 
 def session_post_patch(*return_values: dict):
@@ -102,8 +106,8 @@ def test_recentchanges(post_mock):
     {'retry-after': '5'},
     {'errors': [{'code': 'maxlag', 'text': 'Waiting for 10.64.16.7: 0.80593395233154 seconds lagged.', 'data': {'host': '10.64.16.7', 'lag': 0.805933952331543, 'type': 'db'}, 'module': 'main'}], 'docref': 'See https://www.mediawiki.org/w/api.php for API usage. Subscribe to the mediawiki-api-announce mailing list at &lt;https://lists.wikimedia.org/mailman/listinfo/mediawiki-api-announce&gt; for notice of API deprecations and breaking changes.', 'servedby': 'mw1225'},
     {}, {'batchcomplete': True, 'query': {'tokens': {'watchtoken': '+\\'}}})
-def test_maxlag(post_mock, warning_mock):
-    tokens = api.tokens('watch')
+def test_maxlag(post_mock, warning_mock, cleared_api):
+    tokens = cleared_api.tokens('watch')
     assert tokens == {'watchtoken': '+\\'}
     post_data = {'meta': 'tokens', 'type': 'watch', 'action': 'query', 'format': 'json', 'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5}
     assert [c.kwargs['data'] for c in post_mock.mock_calls] == \
@@ -167,9 +171,9 @@ def test_context_manager():
 @session_post_patch(
     {}, {'batchcomplete': True, 'query': {'tokens': {'patroltoken': '+\\'}}},
     {}, {'errors': [{'code': 'permissiondenied', 'text': 'T', 'module': 'patrol'}], 'docref': 'D', 'servedby': 'mw1233'})
-def test_patrol_not_logged_in(post_mock):
+def test_patrol_not_logged_in(post_mock, cleared_api):
     try:
-        api.patrol(revid=27040231)
+        cleared_api.patrol(revid=27040231)
     except APIError:
         pass
     else:  # pragma: nocover
@@ -195,7 +199,7 @@ def test_bad_patrol_token(_):
         pass
     else:  # pragma: nocover
         raise AssertionError('APIError was not raised')
-    with patch.object(api, 'tokens', return_value={'patroltoken': 'N'}) as tokens_mock:
+    with patch.object(API, 'tokens', return_value={'patroltoken': 'N'}) as tokens_mock:
         assert api.patrol_token == 'N'
     tokens_mock.assert_called_once_with('patrol')
 

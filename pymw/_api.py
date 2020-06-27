@@ -22,7 +22,7 @@ class LoginError(RuntimeError):
 # noinspection PyShadowingBuiltins,PyAttributeOutsideInit
 class API:
     __slots__ = 'url', 'session', 'maxlag', '_csrf_token',\
-        '_login_token', '_patrol_token', '_assertuser'
+        '_login_token', '_patrol_token', '_assert_user'
 
     def __init__(
         self, url: str, user_agent: str = None, maxlag: int = 5,
@@ -43,6 +43,7 @@ class API:
         s = self.session = Session()
         s.headers.update({'User-Agent': user_agent or f'mwpy/v{__version__}'})
         self.maxlag = maxlag
+        self._assert_user = None
 
     def post(self, **data: Any) -> dict:
         """Post a request to MW API and return the json response.
@@ -56,8 +57,8 @@ class API:
             'formatversion': '2',
             'errorformat': 'plaintext',
             'maxlag': self.maxlag}
-        if self._assertuser:
-            data['assertuser'] = self._assertuser
+        if self._assert_user is not None:
+            data['assertuser'] = self._assert_user
         resp = self.session.post(self.url, data=data)
         json = resp.json()
         debug('json response: %s', json)
@@ -177,14 +178,14 @@ class API:
         result = json['login']['result']
         if result == 'Success':
             self.clear_cache()
+            self._assert_user = lgname
             return
         if result == 'WrongToken':
             # token is outdated?
             info(result)
             del self._login_token
             return self.login(lgname, lgpassword, **kwargs)
-        self._assertuser = lgname
-        raise LoginError(pformat(json['login']['reason']))
+        raise LoginError(pformat(json))
 
     def close(self) -> None:
         """Close the current API session."""
@@ -313,6 +314,7 @@ class API:
     def clear_cache(self):
         """Clear cached values."""
         del self.login_token, self.patrol_token, self.csrf_token
+        self._assert_user = None
 
     def logevents(self, lelimit: int = 'max', **kwargs):
         """https://www.mediawiki.org/wiki/API:Logevents"""
