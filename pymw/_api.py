@@ -53,7 +53,6 @@ class API:
         Add format, formatversion and errorformat, maxlag and utf8.
         Warn about warnings and raise errors as APIError.
         """
-        debug('post data: %s', data)
         data |= {
             'format': 'json',
             'formatversion': '2',
@@ -61,6 +60,7 @@ class API:
             'maxlag': self.maxlag}
         if self._assert_user is not None:
             data['assertuser'] = self._assert_user
+        debug('post data: %s', data)
         resp = self.session.post(self.url, data=data)
         json = resp.json()
         debug('json response: %s', json)

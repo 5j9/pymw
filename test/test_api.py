@@ -287,3 +287,11 @@ def test_login_config(post_mock):
     # note that assert_called_with only checks the last call
     post_mock.assert_called_with(**post_call_kwargs)
     pymw_toml_mock.assert_called_once()
+
+
+@session_post_patch({})
+def test_assert_login(post_mock):
+    api._assert_user = 'USER'
+    with raises(StopIteration):
+        api.post()
+    assert post_mock.mock_calls[0].kwargs['data']['assertuser'] == 'USER'
