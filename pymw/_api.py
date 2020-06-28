@@ -50,7 +50,8 @@ class API:
     def post(self, **data: Any) -> dict:
         """Post a request to MW API and return the json response.
 
-        Add format, formatversion and errorformat, maxlag and utf8.
+        Force format=json, formatversion=2, errorformat=plaintext, and
+        maxlag=self.maxlag.
         Warn about warnings and raise errors as APIError.
         """
         data |= {
