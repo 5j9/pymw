@@ -26,6 +26,12 @@ class API:
     __slots__ = 'url', 'session', 'maxlag', '_csrf_token',\
         '_login_token', '_patrol_token', '_assert_user'
 
+    def __enter__(self) -> 'API':
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self.close()
+
     def __init__(
         self, url: str, user_agent: str = None, maxlag: int = 5,
     ) -> None:
@@ -47,30 +53,6 @@ class API:
         self.maxlag = maxlag
         self._assert_user = None
 
-    def post(self, **data: Any) -> dict:
-        """Post a request to MW API and return the json response.
-
-        Force format=json, formatversion=2, errorformat=plaintext, and
-        maxlag=self.maxlag.
-        Warn about warnings and raise errors as APIError.
-        """
-        data |= {
-            'format': 'json',
-            'formatversion': '2',
-            'errorformat': 'plaintext',
-            'maxlag': self.maxlag}
-        if self._assert_user is not None:
-            data['assertuser'] = self._assert_user
-        debug('post data: %s', data)
-        resp = self.session.post(self.url, data=data)
-        json = resp.json()
-        debug('json response: %s', json)
-        if 'warnings' in json:
-            warning(pformat(json['warnings']))
-        if 'errors' in json:
-            return self._handle_api_errors(data, resp, json)
-        return json
-
     def _handle_api_errors(
         self, data: dict, resp: Response, json: dict
     ) -> dict:
@@ -87,6 +69,13 @@ class API:
                 return handler_result
         raise APIError(errors)
 
+    def _handle_badtoken_error(
+        self, _: Response, __: dict, error: dict
+    ) -> None:
+        if error['module'] == 'patrol':
+            info('invalidating patrol token cache')
+            del self.patrol_token
+
     def _handle_maxlag_error(
         self, resp: Response, data: dict, _
     ) -> dict:
@@ -95,12 +84,10 @@ class API:
         sleep(int(retry_after))
         return self.post(**data)
 
-    def _handle_badtoken_error(
-        self, _: Response, __: dict, error: dict
-    ) -> None:
-        if error['module'] == 'patrol':
-            info('invalidating patrol token cache')
-            del self.patrol_token
+    def clear_cache(self) -> None:
+        """Clear cached values."""
+        del self.login_token, self.patrol_token, self.csrf_token
+        self._assert_user = None
 
     @property
     def csrf_token(self) -> str:
@@ -117,6 +104,10 @@ class API:
     @csrf_token.deleter
     def csrf_token(self) -> None:
         self._csrf_token = None
+
+    def filerepoinfo(self, **kwargs: Any) -> dict:
+        """https://www.mediawiki.org/wiki/API:Filerepoinfo"""
+        return self.query_meta('filerepoinfo', **kwargs)
 
     def logout(self) -> None:
         """https://www.mediawiki.org/wiki/API:Logout"""
@@ -153,7 +144,7 @@ class API:
 
         https://www.mediawiki.org/wiki/API:Tokens
         """
-        return self.meta_query('tokens', type=type)
+        return self.query_meta('tokens', type=type)
 
     @property
     def login_token(self) -> None:
@@ -206,13 +197,7 @@ class API:
         """Close the current API session."""
         self.session.close()
 
-    def __enter__(self) -> 'API':
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        self.close()
-
-    def list_query(
+    def query_list(
         self, list: str, **params: Any
     ) -> Generator[dict, None, None]:
         """Post a list query and yield the results.
@@ -224,7 +209,7 @@ class API:
             for item in json['query'][list]:
                 yield item
 
-    def prop_query(
+    def query_prop(
         self, prop: str, **params: Any
     ) -> Generator[dict, None, None]:
         """Post a prop query, handle batchcomplete, and yield the results.
@@ -260,12 +245,12 @@ class API:
     def langlinks(
         self, lllimit: int = 'max', **kwargs: Any
     ) -> Generator[dict, None, None]:
-        for page_llink in self.prop_query(
+        for page_llink in self.query_prop(
             'langlinks', lllimit=lllimit, **kwargs
         ):
             yield page_llink
 
-    def meta_query(self, meta, **kwargs: Any) -> dict:
+    def query_meta(self, meta, **kwargs: Any) -> dict:
         """Post a meta query and return the result .
 
         Note: Some meta queries require special handling. Use `self.query()`
@@ -285,27 +270,30 @@ class API:
             assert json['batchcomplete'] is True
             return json['query'][meta]
 
-    def userinfo(self, **kwargs) -> dict:
-        """https://www.mediawiki.org/wiki/API:Userinfo"""
-        return self.meta_query('userinfo', **kwargs)
-
-    def siteinfo(self, **kwargs: Any) -> dict:
-        """https://www.mediawiki.org/wiki/API:Siteinfo"""
-        return self.meta_query('siteinfo', **kwargs)
-
     def recentchanges(
         self, rclimit: int = 'max', **kwargs: Any
     ) -> Generator[dict, None, None]:
         """https://www.mediawiki.org/wiki/API:RecentChanges"""
         # Todo: somehow support rcgeneraterevisions
-        for rc in self.list_query(
+        for rc in self.query_list(
             list='recentchanges', rclimit=rclimit, **kwargs
         ):
             yield rc
 
-    def filerepoinfo(self, **kwargs: Any) -> dict:
-        """https://www.mediawiki.org/wiki/API:Filerepoinfo"""
-        return self.meta_query('filerepoinfo', **kwargs)
+    def siteinfo(self, **kwargs: Any) -> dict:
+        """https://www.mediawiki.org/wiki/API:Siteinfo"""
+        return self.query_meta('siteinfo', **kwargs)
+
+    def userinfo(self, **kwargs) -> dict:
+        """https://www.mediawiki.org/wiki/API:Userinfo"""
+        return self.query_meta('userinfo', **kwargs)
+
+    def logevents(
+        self, lelimit: int = 'max', **kwargs
+    ) -> Generator[dict, None, None]:
+        """https://www.mediawiki.org/wiki/API:Logevents"""
+        for e in self.query_list('logevents', lelimit=lelimit, **kwargs):
+            yield e
 
     @property
     def patrol_token(self) -> str:
@@ -334,17 +322,29 @@ class API:
         """
         self.post(action='patrol', token=self.patrol_token, **kwargs)
 
-    def clear_cache(self) -> None:
-        """Clear cached values."""
-        del self.login_token, self.patrol_token, self.csrf_token
-        self._assert_user = None
+    def post(self, **data: Any) -> dict:
+        """Post a request to MW API and return the json response.
 
-    def logevents(
-        self, lelimit: int = 'max', **kwargs
-    ) -> Generator[dict, None, None]:
-        """https://www.mediawiki.org/wiki/API:Logevents"""
-        for e in self.list_query('logevents', lelimit=lelimit, **kwargs):
-            yield e
+        Force format=json, formatversion=2, errorformat=plaintext, and
+        maxlag=self.maxlag.
+        Warn about warnings and raise errors as APIError.
+        """
+        data |= {
+            'format': 'json',
+            'formatversion': '2',
+            'errorformat': 'plaintext',
+            'maxlag': self.maxlag}
+        if self._assert_user is not None:
+            data['assertuser'] = self._assert_user
+        debug('post data: %s', data)
+        resp = self.session.post(self.url, data=data)
+        json = resp.json()
+        debug('json response: %s', json)
+        if 'warnings' in json:
+            warning(pformat(json['warnings']))
+        if 'errors' in json:
+            return self._handle_api_errors(data, resp, json)
+        return json
 
     def revisions(self, **kwargs) -> dict:
         """https://www.mediawiki.org/wiki/API:Revisions
@@ -356,7 +356,7 @@ class API:
             or 'rvend' in keys or 'rvlimit' in keys
         ):  # Mode 2: Get revisions for one given page
             kwargs['rvlimit'] = 'max'
-        for revisions in self.prop_query('revisions', **kwargs):
+        for revisions in self.query_prop('revisions', **kwargs):
             yield revisions
 
 
