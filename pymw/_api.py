@@ -36,7 +36,7 @@ class TokenManager(dict):
         return v
 
 
-# noinspection PyShadowingBuiltins,PyAttributeOutsideInit
+# noinspection PyShadowingBuiltins
 class API:
     __slots__ = 'url', 'session', 'maxlag', 'tokens', '_assert_user'
 
