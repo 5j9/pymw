@@ -13,11 +13,15 @@ __version__ = '0.4.dev0'
 PARSED_TOML: Optional[str] = None
 
 
-class APIError(RuntimeError):
+class PYMWError(RuntimeError):
     pass
 
 
-class LoginError(RuntimeError):
+class APIError(PYMWError):
+    pass
+
+
+class LoginError(PYMWError):
     pass
 
 
