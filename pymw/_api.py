@@ -1,5 +1,5 @@
 from pprint import pformat
-from typing import Any, Generator, Optional
+from typing import Any, Generator, IO, Optional
 from logging import warning, debug, info
 from pathlib import Path
 from time import sleep
@@ -109,20 +109,20 @@ class API:
         del self.tokens.api  # cyclic reference
         self.session.close()
 
-    def filerepoinfo(self, **kwargs: Any) -> dict:
+    def filerepoinfo(self, **params: Any) -> dict:
         """https://www.mediawiki.org/wiki/API:Filerepoinfo"""
-        return self.query_meta('filerepoinfo', **kwargs)
+        return self.query_meta('filerepoinfo', **params)
 
     def langlinks(
-        self, lllimit: int = 'max', **kwargs: Any
+        self, lllimit: int = 'max', **params: Any
     ) -> Generator[dict, None, None]:
         for page_llink in self.query_prop(
-            'langlinks', lllimit=lllimit, **kwargs
+            'langlinks', lllimit=lllimit, **params
         ):
             yield page_llink
 
     def login(
-        self, lgname: str = None, lgpassword: str = None, **kwargs: Any
+        self, lgname: str = None, lgpassword: str = None, **params: Any
     ) -> None:
         """https://www.mediawiki.org/wiki/API:Login
 
@@ -135,7 +135,7 @@ class API:
             'lgname': lgname,
             'lgpassword': lgpassword,
             'lgtoken': self.tokens['login'],
-            **kwargs})
+            **params})
         result = json['login']['result']
         if result == 'Success':
             self.clear_cache()
@@ -145,7 +145,7 @@ class API:
             # token is outdated?
             info(result)
             del self.tokens['login']
-            return self.login(lgname, lgpassword, **kwargs)
+            return self.login(lgname, lgpassword, **params)
         raise LoginError(pformat(json))
 
     def logout(self) -> None:
@@ -153,13 +153,13 @@ class API:
         self.post({'action': 'logout', 'token': self.tokens['csrf']})
         self.clear_cache()
 
-    def patrol(self, **kwargs: Any) -> dict:
+    def patrol(self, **params: Any) -> dict:
         """https://www.mediawiki.org/wiki/API:Patrol
 
         `token` will be added automatically.
         """
         return self.post(
-            {'action': 'patrol', 'token': self.tokens['patrol'], **kwargs})
+            {'action': 'patrol', 'token': self.tokens['patrol'], **params})
 
     def post(self, data: dict) -> dict:
         """Post a request to MW API and return the json response.
@@ -222,7 +222,7 @@ class API:
             for item in json['query'][list]:
                 yield item
 
-    def query_meta(self, meta, **kwargs: Any) -> dict:
+    def query_meta(self, meta, **params: Any) -> dict:
         """Post a meta query and return the result .
 
         Note: Some meta queries require special handling. Use `self.query()`
@@ -232,11 +232,11 @@ class API:
         https://www.mediawiki.org/wiki/API:Meta
         """
         if meta == 'siteinfo':
-            for json in self.query(meta='siteinfo', **kwargs):
+            for json in self.query(meta='siteinfo', **params):
                 assert 'batchcomplete' in json
                 assert 'continue' not in json
                 return json['query']
-        for json in self.query(meta=meta, **kwargs):
+        for json in self.query(meta=meta, **params):
             if meta == 'filerepoinfo':
                 meta = 'repos'
             assert json['batchcomplete'] is True
@@ -276,39 +276,39 @@ class API:
                     batch_page[prop] += page[prop]
 
     def recentchanges(
-        self, rclimit: int = 'max', **kwargs: Any
+        self, rclimit: int = 'max', **params: Any
     ) -> Generator[dict, None, None]:
         """https://www.mediawiki.org/wiki/API:RecentChanges"""
         # Todo: somehow support rcgeneraterevisions
         yield from self.query_list(
-            list='recentchanges', rclimit=rclimit, **kwargs)
+            list='recentchanges', rclimit=rclimit, **params)
 
-    def revisions(self, **kwargs) -> dict:
+    def revisions(self, **params) -> dict:
         """https://www.mediawiki.org/wiki/API:Revisions
 
         If in mode 2 and 'rvlimit' is not specified, 'max' will be used.
         """
-        if 'rvlimit' not in kwargs and (
-            'rvstart' in (keys := kwargs.keys())
+        if 'rvlimit' not in params and (
+            'rvstart' in (keys := params.keys())
             or 'rvend' in keys or 'rvlimit' in keys
         ):  # Mode 2: Get revisions for one given page
-            kwargs['rvlimit'] = 'max'
-        for revisions in self.query_prop('revisions', **kwargs):
+            params['rvlimit'] = 'max'
+        for revisions in self.query_prop('revisions', **params):
             yield revisions
 
-    def siteinfo(self, **kwargs: Any) -> dict:
+    def siteinfo(self, **params: Any) -> dict:
         """https://www.mediawiki.org/wiki/API:Siteinfo"""
-        return self.query_meta('siteinfo', **kwargs)
+        return self.query_meta('siteinfo', **params)
 
-    def userinfo(self, **kwargs) -> dict:
+    def userinfo(self, **params) -> dict:
         """https://www.mediawiki.org/wiki/API:Userinfo"""
-        return self.query_meta('userinfo', **kwargs)
+        return self.query_meta('userinfo', **params)
 
     def logevents(
-        self, lelimit: int = 'max', **kwargs
+        self, lelimit: int = 'max', **params
     ) -> Generator[dict, None, None]:
         """https://www.mediawiki.org/wiki/API:Logevents"""
-        yield from self.query_list('logevents', lelimit=lelimit, **kwargs)
+        yield from self.query_list('logevents', lelimit=lelimit, **params)
 
 
 def load_lgname_lgpass(api_url, username=None) -> tuple:
