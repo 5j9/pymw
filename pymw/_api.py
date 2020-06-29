@@ -1,5 +1,5 @@
 from pprint import pformat
-from typing import Any, Optional
+from typing import Any, Generator, Optional
 from logging import warning, debug, info
 from pathlib import Path
 from time import sleep
@@ -119,23 +119,30 @@ class API:
         self.post(action='logout', token=self.csrf_token)
         self.clear_cache()
 
-    def query(self, **params) -> dict:
+    def post_and_continue(self, data) -> Generator[dict, None, None]:
+        """Yield and continue post results until all the data is consumed."""
+        if 'rawcontinue' in data:
+            raise NotImplementedError(
+                'rawcontinue is not implemented for query method')
+        while True:
+            json = self.post(**data)
+            continue_ = json.get('continue')
+            yield json
+            if continue_ is None:
+                return
+            data |= continue_
+
+    def query(self, **params) -> Generator[dict, None, None]:
         """Post an API query and yield results.
 
         Handle continuations.
 
         https://www.mediawiki.org/wiki/API:Query
         """
-        if 'rawcontinue' in params:
-            raise NotImplementedError(
-                'rawcontinue is not implemented for query method')
-        while True:
-            json = self.post(action='query', **params)
-            continue_ = json.get('continue')
-            yield json
-            if continue_ is None:
-                return
-            params.update(continue_)
+        # todo: titles or pageids is limited to 50 titles per query,
+        #  or 500 for those with the apihighlimits right.
+        params['action'] = 'query'
+        yield from self.post_and_continue(params)
 
     def tokens(self, type: str) -> dict[str, str]:
         """Query API for tokens. Return the json response.
