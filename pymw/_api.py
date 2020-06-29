@@ -21,10 +21,20 @@ class LoginError(RuntimeError):
     pass
 
 
+class TokenManager(dict):
+
+    def __init__(self, api: 'API'):
+        self.api = api
+        super().__init__()
+
+    def __missing__(self, key):
+        val = self[key] = self.api.query_meta_tokens(key)[f'{key}token']
+        return val
+
+
 # noinspection PyShadowingBuiltins,PyAttributeOutsideInit
 class API:
-    __slots__ = 'url', 'session', 'maxlag', '_csrf_token',\
-        '_login_token', '_patrol_token', '_assert_user'
+    __slots__ = 'url', 'session', 'maxlag', 'tokens', '_assert_user'
 
     def __enter__(self) -> 'API':
         return self
@@ -51,6 +61,7 @@ class API:
         s = self.session = Session()
         s.headers.update({'User-Agent': user_agent or f'mwpy/v{__version__}'})
         self.maxlag = maxlag
+        self.tokens = TokenManager(self)
         self._assert_user = None
 
     def _handle_api_errors(
@@ -74,7 +85,7 @@ class API:
     ) -> None:
         if error['module'] == 'patrol':
             info('invalidating patrol token cache')
-            del self.patrol_token
+            del self.tokens['patrol']
 
     def _handle_maxlag_error(
         self, resp: Response, data: dict, _
@@ -86,24 +97,8 @@ class API:
 
     def clear_cache(self) -> None:
         """Clear cached values."""
-        del self.login_token, self.patrol_token, self.csrf_token
+        self.tokens.clear()
         self._assert_user = None
-
-    @property
-    def csrf_token(self) -> str:
-        token = getattr(self, '_csrf_token', None)
-        if token is None:
-            token = self._csrf_token = (
-                self.tokens('csrf'))['csrftoken']
-        return token
-
-    @csrf_token.setter
-    def csrf_token(self, value: str) -> None:
-        self._csrf_token = value
-
-    @csrf_token.deleter
-    def csrf_token(self) -> None:
-        self._csrf_token = None
 
     def filerepoinfo(self, **kwargs: Any) -> dict:
         """https://www.mediawiki.org/wiki/API:Filerepoinfo"""
@@ -111,7 +106,7 @@ class API:
 
     def logout(self) -> None:
         """https://www.mediawiki.org/wiki/API:Logout"""
-        self.post(action='logout', token=self.csrf_token)
+        self.post(action='logout', token=self.tokens['csrf'])
         self.clear_cache()
 
     def post_and_continue(self, data: dict) -> Generator[dict, None, None]:
@@ -139,32 +134,15 @@ class API:
         params['action'] = 'query'
         yield from self.post_and_continue(params)
 
-    def tokens(self, type: str) -> dict[str, str]:
-        """Query API for tokens. Return the json response.
+    def query_meta_tokens(self, type: str) -> dict[str, str]:
+        """Query API for tokens and return the response.
+
+        Most of the time `self.tokens` should be used instead of calling this
+        method directly.
 
         https://www.mediawiki.org/wiki/API:Tokens
         """
         return self.query_meta('tokens', type=type)
-
-    @property
-    def login_token(self) -> None:
-        """Fetch login token and cache the result.
-
-        Use deleter to invalidate cache.
-        """
-        token = getattr(self, '_login_token', None)
-        if token is None:
-            token = self._login_token = (
-                self.tokens('login'))['logintoken']
-        return token
-
-    @login_token.setter
-    def login_token(self, value: str) -> None:
-        self._login_token = value
-
-    @login_token.deleter
-    def login_token(self) -> None:
-        self._login_token = None
 
     def login(
         self, lgname: str = None, lgpassword: str = None, **kwargs: Any
@@ -179,7 +157,7 @@ class API:
             action='login',
             lgname=lgname,
             lgpassword=lgpassword,
-            lgtoken=self.login_token,
+            lgtoken=self.tokens['login'],
             **kwargs)
         result = json['login']['result']
         if result == 'Success':
@@ -189,7 +167,7 @@ class API:
         if result == 'WrongToken':
             # token is outdated?
             info(result)
-            del self._login_token
+            del self.tokens['login']
             return self.login(lgname, lgpassword, **kwargs)
         raise LoginError(pformat(json))
 
@@ -295,32 +273,12 @@ class API:
         for e in self.query_list('logevents', lelimit=lelimit, **kwargs):
             yield e
 
-    @property
-    def patrol_token(self) -> str:
-        """Fetch patrol token and cache the result.
-
-        Use deleter to invalidate cache.
-        """
-        token = getattr(self, '_patrol_token', None)
-        if token is None:
-            token = self._patrol_token = (
-                self.tokens('patrol'))['patroltoken']
-        return token
-
-    @patrol_token.setter
-    def patrol_token(self, value: str) -> None:
-        self._patrol_token = value
-
-    @patrol_token.deleter
-    def patrol_token(self) -> None:
-        self._patrol_token = None
-
     def patrol(self, **kwargs: Any) -> None:
         """https://www.mediawiki.org/wiki/API:Patrol
 
         `token` will be added automatically.
         """
-        self.post(action='patrol', token=self.patrol_token, **kwargs)
+        self.post(action='patrol', token=self.tokens['patrol'], **kwargs)
 
     def post(self, **data: Any) -> dict:
         """Post a request to MW API and return the json response.

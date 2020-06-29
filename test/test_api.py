@@ -78,7 +78,7 @@ def test_bad_login_token(post_mock):
 
 @api_post_patch({'login': {'result': 'U', 'lguserid': 1, 'lgusername': 'U'}})
 def test_unknown_login_result(post_mock):
-    api.login_token = 'T'
+    api.tokens['login'] = 'T'
     try:
         api.login(lgname='U', lgpassword='P')
     except LoginError:
@@ -108,7 +108,7 @@ def test_recentchanges(post_mock):
     {'errors': [{'code': 'maxlag', 'text': 'Waiting for 10.64.16.7: 0.80593395233154 seconds lagged.', 'data': {'host': '10.64.16.7', 'lag': 0.805933952331543, 'type': 'db'}, 'module': 'main'}], 'docref': 'See https://www.mediawiki.org/w/api.php for API usage. Subscribe to the mediawiki-api-announce mailing list at &lt;https://lists.wikimedia.org/mailman/listinfo/mediawiki-api-announce&gt; for notice of API deprecations and breaking changes.', 'servedby': 'mw1225'},
     {}, {'batchcomplete': True, 'query': {'tokens': {'watchtoken': '+\\'}}})
 def test_maxlag(post_mock, warning_mock, cleared_api):
-    tokens = cleared_api.tokens('watch')
+    tokens = cleared_api.query_meta_tokens('watch')
     assert tokens == {'watchtoken': '+\\'}
     post_data = {'meta': 'tokens', 'type': 'watch', 'action': 'query', 'format': 'json', 'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5}
     assert [c.kwargs['data'] for c in post_mock.mock_calls] == \
@@ -186,23 +186,24 @@ def test_patrol_not_logged_in(post_mock, cleared_api):
 
 @api_post_patch({'patrol': {'rcid': 1, 'ns': 4, 'title': 'T'}})
 def test_patrol(post_mock):
-    api.patrol_token = '+'
+    api.tokens['patrol'] = 'T'
     api.patrol(revid=1)
-    post_mock.assert_called_with(action='patrol', token='+', revid=1)
+    post_mock.assert_called_with(action='patrol', token='T', revid=1)
 
 
 @session_post_patch({}, {'errors': [{'code': 'badtoken', 'text': 'Invalid CSRF token.', 'module': 'patrol'}], 'docref': 'D', 'servedby': 'mw1279'})
 def test_bad_patrol_token(_):
-    api.patrol_token = '+'
+    api.tokens['patrol'] = 'T'
     try:
         api.patrol(revid=1)
     except APIError:
         pass
     else:  # pragma: nocover
         raise AssertionError('APIError was not raised')
-    with patch.object(API, 'tokens', return_value={'patroltoken': 'N'}) as tokens_mock:
-        assert api.patrol_token == 'N'
-    tokens_mock.assert_called_once_with('patrol')
+    with patch.object(
+            API, 'query_meta_tokens', return_value={'patroltoken': 'N'}) as m:
+        assert api.tokens['patrol'] == 'N'
+    m.assert_called_once_with('patrol')
 
 
 def test_rawcontinue():
@@ -227,15 +228,15 @@ def test_warnings(warning_mock):
 
 @api_post_patch({})
 def test_logout(post_mock):
-    api.csrf_token = 'T'
+    api.tokens['csrf'] = 'T'
     api.logout()
     post_mock.assert_called_once()
-    assert api._csrf_token is None
+    assert 'csrf' not in api.tokens
 
 
 @api_post_patch({'batchcomplete': True, 'query': {'tokens': {'csrftoken': '+\\'}}})
 def test_csrf_token(post_mock):
-    assert api.csrf_token == '+\\'
+    assert api.tokens['csrf'] == '+\\'
     post_mock.assert_called_once()
 
 
@@ -278,7 +279,7 @@ def test_login_config(post_mock):
     post_call_kwargs = {
         'action': 'login', 'lgname': 'username@toolname',
         'lgpassword': 'bot_password', 'lgtoken': 'LOGIN_TOKEN'}
-    api.login_token = 'LOGIN_TOKEN'
+    api.tokens['login'] = 'LOGIN_TOKEN'
     with raises(KeyError):  # because of invalid api_post_patch response
         api.login()  # without username
     post_mock.assert_called_once_with(**post_call_kwargs)
