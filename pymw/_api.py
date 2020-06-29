@@ -105,12 +105,14 @@ class API:
         self._assert_user = None
 
     def close(self) -> None:
-        """Close the current API session."""
+        """Close the current API session and detach TokenManger."""
         del self.tokens.api  # cyclic reference
         self.session.close()
 
     def filerepoinfo(self, **params: Any) -> dict:
-        """https://www.mediawiki.org/wiki/API:Filerepoinfo"""
+        """Return meta information about image repositories on the wiki.
+
+        https://www.mediawiki.org/wiki/API:Filerepoinfo"""
         return self.query_meta('filerepoinfo', **params)
 
     def langlinks(
@@ -124,9 +126,17 @@ class API:
     def login(
         self, lgname: str = None, lgpassword: str = None, **params: Any
     ) -> None:
-        """https://www.mediawiki.org/wiki/API:Login
+        """Log in and set authentication cookies.
 
+        Should only be used in combination with Special:BotPasswords.
         `lgtoken` will be added automatically.
+
+        :param lgname: User name. If not provided will be retrieved from
+            ~/.pymw.toml. See README.rst for more info.
+        :param lgpassword: Password. If not provided will be retrieved from
+            ~/.pymw.toml. See README.rst for more info.
+
+        https://www.mediawiki.org/wiki/API:Login
         """
         if lgpassword is None:
             lgname, lgpassword = load_lgname_lgpass(self.url, lgname)
@@ -149,14 +159,19 @@ class API:
         raise LoginError(pformat(json))
 
     def logout(self) -> None:
-        """https://www.mediawiki.org/wiki/API:Logout"""
+        """Log out and clear session data.
+
+        https://www.mediawiki.org/wiki/API:Logout
+        """
         self.post({'action': 'logout', 'token': self.tokens['csrf']})
         self.clear_cache()
 
     def patrol(self, **params: Any) -> dict:
-        """https://www.mediawiki.org/wiki/API:Patrol
+        """Patrol a page or revision.
 
         `token` will be added automatically.
+
+        https://www.mediawiki.org/wiki/API:Patrol
         """
         return self.post(
             {'action': 'patrol', 'token': self.tokens['patrol'], **params})
@@ -278,15 +293,23 @@ class API:
     def recentchanges(
         self, rclimit: int = 'max', **params: Any
     ) -> Generator[dict, None, None]:
-        """https://www.mediawiki.org/wiki/API:RecentChanges"""
+        """Enumerate recent changes.
+
+        Continuation will be handled internally.
+
+        https://www.mediawiki.org/wiki/API:RecentChanges
+        """
         # Todo: somehow support rcgeneraterevisions
         yield from self.query_list(
             list='recentchanges', rclimit=rclimit, **params)
 
     def revisions(self, **params) -> dict:
-        """https://www.mediawiki.org/wiki/API:Revisions
+        """Get revision information.
 
         If in mode 2 and 'rvlimit' is not specified, 'max' will be used.
+        `rvcontinue` will be handled internally.
+
+        https://www.mediawiki.org/wiki/API:Revisions
         """
         if 'rvlimit' not in params and (
             'rvstart' in (keys := params.keys())
@@ -297,17 +320,26 @@ class API:
             yield revisions
 
     def siteinfo(self, **params: Any) -> dict:
-        """https://www.mediawiki.org/wiki/API:Siteinfo"""
+        """Return general information about the site.
+
+        https://www.mediawiki.org/wiki/API:Siteinfo
+        """
         return self.query_meta('siteinfo', **params)
 
     def userinfo(self, **params) -> dict:
-        """https://www.mediawiki.org/wiki/API:Userinfo"""
+        """Get information about the current user.
+
+        https://www.mediawiki.org/wiki/API:Userinfo
+        """
         return self.query_meta('userinfo', **params)
 
     def logevents(
         self, lelimit: int = 'max', **params
     ) -> Generator[dict, None, None]:
-        """https://www.mediawiki.org/wiki/API:Logevents"""
+        """Get events from logs.
+
+        https://www.mediawiki.org/wiki/API:Logevents
+        """
         yield from self.query_list('logevents', lelimit=lelimit, **params)
 
 
