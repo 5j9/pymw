@@ -71,7 +71,9 @@ class API:
             return self._handle_api_errors(data, resp, json)
         return json
 
-    def _handle_api_errors(self, data: dict, resp: Response, json: dict):
+    def _handle_api_errors(
+        self, data: dict, resp: Response, json: dict
+    ) -> dict:
         errors = json['errors']
         for error in errors:
             if (
@@ -93,13 +95,15 @@ class API:
         sleep(int(retry_after))
         return self.post(**data)
 
-    def _handle_badtoken_error(self, _: Response, __: dict, error: dict):
+    def _handle_badtoken_error(
+        self, _: Response, __: dict, error: dict
+    ) -> None:
         if error['module'] == 'patrol':
             info('invalidating patrol token cache')
             del self.patrol_token
 
     @property
-    def csrf_token(self):
+    def csrf_token(self) -> str:
         token = getattr(self, '_csrf_token', None)
         if token is None:
             token = self._csrf_token = (
@@ -107,19 +111,19 @@ class API:
         return token
 
     @csrf_token.setter
-    def csrf_token(self, value):
+    def csrf_token(self, value: str) -> None:
         self._csrf_token = value
 
     @csrf_token.deleter
-    def csrf_token(self):
+    def csrf_token(self) -> None:
         self._csrf_token = None
 
-    def logout(self):
+    def logout(self) -> None:
         """https://www.mediawiki.org/wiki/API:Logout"""
         self.post(action='logout', token=self.csrf_token)
         self.clear_cache()
 
-    def post_and_continue(self, data) -> Generator[dict, None, None]:
+    def post_and_continue(self, data: dict) -> Generator[dict, None, None]:
         """Yield and continue post results until all the data is consumed."""
         if 'rawcontinue' in data:
             raise NotImplementedError(
@@ -152,7 +156,7 @@ class API:
         return self.meta_query('tokens', type=type)
 
     @property
-    def login_token(self):
+    def login_token(self) -> None:
         """Fetch login token and cache the result.
 
         Use deleter to invalidate cache.
@@ -164,11 +168,11 @@ class API:
         return token
 
     @login_token.setter
-    def login_token(self, value):
+    def login_token(self, value: str) -> None:
         self._login_token = value
 
     @login_token.deleter
-    def login_token(self):
+    def login_token(self) -> None:
         self._login_token = None
 
     def login(
@@ -202,13 +206,15 @@ class API:
         """Close the current API session."""
         self.session.close()
 
-    def __enter__(self):
+    def __enter__(self) -> 'API':
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         self.close()
 
-    def list_query(self, list: str, **params: Any):
+    def list_query(
+        self, list: str, **params: Any
+    ) -> Generator[dict, None, None]:
         """Post a list query and yield the results.
 
         https://www.mediawiki.org/wiki/API:Lists
@@ -218,7 +224,9 @@ class API:
             for item in json['query'][list]:
                 yield item
 
-    def prop_query(self, prop: str, **params: Any):
+    def prop_query(
+        self, prop: str, **params: Any
+    ) -> Generator[dict, None, None]:
         """Post a prop query, handle batchcomplete, and yield the results.
 
         https://www.mediawiki.org/wiki/API:Properties
@@ -249,13 +257,15 @@ class API:
                 if page is not batch_page:
                     batch_page[prop] += page[prop]
 
-    def langlinks(self, lllimit: int = 'max', **kwargs: Any):
+    def langlinks(
+        self, lllimit: int = 'max', **kwargs: Any
+    ) -> Generator[dict, None, None]:
         for page_llink in self.prop_query(
             'langlinks', lllimit=lllimit, **kwargs
         ):
             yield page_llink
 
-    def meta_query(self, meta, **kwargs: Any):
+    def meta_query(self, meta, **kwargs: Any) -> dict:
         """Post a meta query and return the result .
 
         Note: Some meta queries require special handling. Use `self.query()`
@@ -275,7 +285,7 @@ class API:
             assert json['batchcomplete'] is True
             return json['query'][meta]
 
-    def userinfo(self, **kwargs):
+    def userinfo(self, **kwargs) -> dict:
         """https://www.mediawiki.org/wiki/API:Userinfo"""
         return self.meta_query('userinfo', **kwargs)
 
@@ -283,7 +293,9 @@ class API:
         """https://www.mediawiki.org/wiki/API:Siteinfo"""
         return self.meta_query('siteinfo', **kwargs)
 
-    def recentchanges(self, rclimit: int = 'max', **kwargs: Any):
+    def recentchanges(
+        self, rclimit: int = 'max', **kwargs: Any
+    ) -> Generator[dict, None, None]:
         """https://www.mediawiki.org/wiki/API:RecentChanges"""
         # Todo: somehow support rcgeneraterevisions
         for rc in self.list_query(
@@ -291,12 +303,12 @@ class API:
         ):
             yield rc
 
-    def filerepoinfo(self, **kwargs: Any):
+    def filerepoinfo(self, **kwargs: Any) -> dict:
         """https://www.mediawiki.org/wiki/API:Filerepoinfo"""
         return self.meta_query('filerepoinfo', **kwargs)
 
     @property
-    def patrol_token(self):
+    def patrol_token(self) -> str:
         """Fetch patrol token and cache the result.
 
         Use deleter to invalidate cache.
@@ -308,11 +320,11 @@ class API:
         return token
 
     @patrol_token.setter
-    def patrol_token(self, value):
+    def patrol_token(self, value: str) -> None:
         self._patrol_token = value
 
     @patrol_token.deleter
-    def patrol_token(self):
+    def patrol_token(self) -> None:
         self._patrol_token = None
 
     def patrol(self, **kwargs: Any) -> None:
@@ -322,17 +334,19 @@ class API:
         """
         self.post(action='patrol', token=self.patrol_token, **kwargs)
 
-    def clear_cache(self):
+    def clear_cache(self) -> None:
         """Clear cached values."""
         del self.login_token, self.patrol_token, self.csrf_token
         self._assert_user = None
 
-    def logevents(self, lelimit: int = 'max', **kwargs):
+    def logevents(
+        self, lelimit: int = 'max', **kwargs
+    ) -> Generator[dict, None, None]:
         """https://www.mediawiki.org/wiki/API:Logevents"""
         for e in self.list_query('logevents', lelimit=lelimit, **kwargs):
             yield e
 
-    def revisions(self, **kwargs):
+    def revisions(self, **kwargs) -> dict:
         """https://www.mediawiki.org/wiki/API:Revisions
 
         If in mode 2 and 'rvlimit' is not specified, 'max' will be used.
@@ -346,7 +360,7 @@ class API:
             yield revisions
 
 
-def load_lgname_lgpass(api_url, username=None):
+def load_lgname_lgpass(api_url, username=None) -> tuple:
     global PARSED_TOML
     if PARSED_TOML is None:
         with (Path('~').expanduser() / '.pymw.toml').open(
