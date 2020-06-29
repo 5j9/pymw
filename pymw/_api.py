@@ -28,8 +28,8 @@ class TokenManager(dict):
         super().__init__()
 
     def __missing__(self, key):
-        val = self[key] = self.api.query_meta_tokens(key)[f'{key}token']
-        return val
+        v = self[key] = self.api.query_meta('tokens', type=key)[f'{key}token']
+        return v
 
 
 # noinspection PyShadowingBuiltins,PyAttributeOutsideInit
@@ -236,16 +236,6 @@ class API:
                 meta = 'repos'
             assert json['batchcomplete'] is True
             return json['query'][meta]
-
-    def query_meta_tokens(self, type: str) -> dict[str, str]:
-        """Query API for tokens and return the response.
-
-        Most of the time `self.tokens` should be used instead of calling this
-        method directly.
-
-        https://www.mediawiki.org/wiki/API:Tokens
-        """
-        return self.query_meta('tokens', type=type)
 
     def query_prop(
         self, prop: str, **params: Any

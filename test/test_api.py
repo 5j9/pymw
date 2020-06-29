@@ -108,7 +108,7 @@ def test_recentchanges(post_mock):
     {'errors': [{'code': 'maxlag', 'text': 'Waiting for 10.64.16.7: 0.80593395233154 seconds lagged.', 'data': {'host': '10.64.16.7', 'lag': 0.805933952331543, 'type': 'db'}, 'module': 'main'}], 'docref': 'See https://www.mediawiki.org/w/api.php for API usage. Subscribe to the mediawiki-api-announce mailing list at &lt;https://lists.wikimedia.org/mailman/listinfo/mediawiki-api-announce&gt; for notice of API deprecations and breaking changes.', 'servedby': 'mw1225'},
     {}, {'batchcomplete': True, 'query': {'tokens': {'watchtoken': '+\\'}}})
 def test_maxlag(post_mock, warning_mock, cleared_api):
-    tokens = cleared_api.query_meta_tokens('watch')
+    tokens = cleared_api.query_meta('tokens', type='watch')
     assert tokens == {'watchtoken': '+\\'}
     post_data = {'meta': 'tokens', 'type': 'watch', 'action': 'query', 'format': 'json', 'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5}
     assert [c.kwargs['data'] for c in post_mock.mock_calls] == \
@@ -201,9 +201,9 @@ def test_bad_patrol_token(_):
     else:  # pragma: nocover
         raise AssertionError('APIError was not raised')
     with patch.object(
-            API, 'query_meta_tokens', return_value={'patroltoken': 'N'}) as m:
+            API, 'query_meta', return_value={'patroltoken': 'N'}) as m:
         assert api.tokens['patrol'] == 'N'
-    m.assert_called_once_with('patrol')
+    m.assert_called_once_with('tokens', type='patrol')
 
 
 def test_rawcontinue():
