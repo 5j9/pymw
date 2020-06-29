@@ -57,12 +57,12 @@ class API:
             https://meta.wikimedia.org/wiki/User-Agent_policy and
             https://www.mediawiki.org/wiki/API:Etiquette#The_User-Agent_header
         """
-        self.url = url
+        self._assert_user = None
+        self.maxlag = maxlag
         s = self.session = Session()
         s.headers.update({'User-Agent': user_agent or f'mwpy/v{__version__}'})
-        self.maxlag = maxlag
         self.tokens = TokenManager(self)
-        self._assert_user = None
+        self.url = url
 
     def _handle_api_errors(
         self, data: dict, resp: Response, json: dict
@@ -100,49 +100,22 @@ class API:
         self.tokens.clear()
         self._assert_user = None
 
+    def close(self) -> None:
+        """Close the current API session."""
+        del self.tokens.api  # cyclic reference
+        self.session.close()
+
     def filerepoinfo(self, **kwargs: Any) -> dict:
         """https://www.mediawiki.org/wiki/API:Filerepoinfo"""
         return self.query_meta('filerepoinfo', **kwargs)
 
-    def logout(self) -> None:
-        """https://www.mediawiki.org/wiki/API:Logout"""
-        self.post(action='logout', token=self.tokens['csrf'])
-        self.clear_cache()
-
-    def post_and_continue(self, data: dict) -> Generator[dict, None, None]:
-        """Yield and continue post results until all the data is consumed."""
-        if 'rawcontinue' in data:
-            raise NotImplementedError(
-                'rawcontinue is not implemented for query method')
-        while True:
-            json = self.post(**data)
-            continue_ = json.get('continue')
-            yield json
-            if continue_ is None:
-                return
-            data |= continue_
-
-    def query(self, **params) -> Generator[dict, None, None]:
-        """Post an API query and yield results.
-
-        Handle continuations.
-
-        https://www.mediawiki.org/wiki/API:Query
-        """
-        # todo: titles or pageids is limited to 50 titles per query,
-        #  or 500 for those with the apihighlimits right.
-        params['action'] = 'query'
-        yield from self.post_and_continue(params)
-
-    def query_meta_tokens(self, type: str) -> dict[str, str]:
-        """Query API for tokens and return the response.
-
-        Most of the time `self.tokens` should be used instead of calling this
-        method directly.
-
-        https://www.mediawiki.org/wiki/API:Tokens
-        """
-        return self.query_meta('tokens', type=type)
+    def langlinks(
+        self, lllimit: int = 'max', **kwargs: Any
+    ) -> Generator[dict, None, None]:
+        for page_llink in self.query_prop(
+            'langlinks', lllimit=lllimit, **kwargs
+        ):
+            yield page_llink
 
     def login(
         self, lgname: str = None, lgpassword: str = None, **kwargs: Any
@@ -171,9 +144,66 @@ class API:
             return self.login(lgname, lgpassword, **kwargs)
         raise LoginError(pformat(json))
 
-    def close(self) -> None:
-        """Close the current API session."""
-        self.session.close()
+    def logout(self) -> None:
+        """https://www.mediawiki.org/wiki/API:Logout"""
+        self.post(action='logout', token=self.tokens['csrf'])
+        self.clear_cache()
+
+    def patrol(self, **kwargs: Any) -> None:
+        """https://www.mediawiki.org/wiki/API:Patrol
+
+        `token` will be added automatically.
+        """
+        self.post(action='patrol', token=self.tokens['patrol'], **kwargs)
+
+    def post(self, **data: Any) -> dict:
+        """Post a request to MW API and return the json response.
+
+        Force format=json, formatversion=2, errorformat=plaintext, and
+        maxlag=self.maxlag.
+        Warn about warnings and raise errors as APIError.
+        """
+        data |= {
+            'format': 'json',
+            'formatversion': '2',
+            'errorformat': 'plaintext',
+            'maxlag': self.maxlag}
+        if self._assert_user is not None:
+            data['assertuser'] = self._assert_user
+        debug('post data: %s', data)
+        resp = self.session.post(self.url, data=data)
+        json = resp.json()
+        debug('json response: %s', json)
+        if 'warnings' in json:
+            warning(pformat(json['warnings']))
+        if 'errors' in json:
+            return self._handle_api_errors(data, resp, json)
+        return json
+
+    def post_and_continue(self, data: dict) -> Generator[dict, None, None]:
+        """Yield and continue post results until all the data is consumed."""
+        if 'rawcontinue' in data:
+            raise NotImplementedError(
+                'rawcontinue is not implemented for query method')
+        while True:
+            json = self.post(**data)
+            continue_ = json.get('continue')
+            yield json
+            if continue_ is None:
+                return
+            data |= continue_
+
+    def query(self, **params) -> Generator[dict, None, None]:
+        """Post an API query and yield results.
+
+        Handle continuations.
+
+        https://www.mediawiki.org/wiki/API:Query
+        """
+        # todo: titles or pageids is limited to 50 titles per query,
+        #  or 500 for those with the apihighlimits right.
+        params['action'] = 'query'
+        yield from self.post_and_continue(params)
 
     def query_list(
         self, list: str, **params: Any
@@ -186,6 +216,36 @@ class API:
             assert json['batchcomplete'] is True  # T84977#5471790
             for item in json['query'][list]:
                 yield item
+
+    def query_meta(self, meta, **kwargs: Any) -> dict:
+        """Post a meta query and return the result .
+
+        Note: Some meta queries require special handling. Use `self.query()`
+            directly if this method cannot handle it properly and there is no
+            other specific method for it.
+
+        https://www.mediawiki.org/wiki/API:Meta
+        """
+        if meta == 'siteinfo':
+            for json in self.query(meta='siteinfo', **kwargs):
+                assert 'batchcomplete' in json
+                assert 'continue' not in json
+                return json['query']
+        for json in self.query(meta=meta, **kwargs):
+            if meta == 'filerepoinfo':
+                meta = 'repos'
+            assert json['batchcomplete'] is True
+            return json['query'][meta]
+
+    def query_meta_tokens(self, type: str) -> dict[str, str]:
+        """Query API for tokens and return the response.
+
+        Most of the time `self.tokens` should be used instead of calling this
+        method directly.
+
+        https://www.mediawiki.org/wiki/API:Tokens
+        """
+        return self.query_meta('tokens', type=type)
 
     def query_prop(
         self, prop: str, **params: Any
@@ -220,34 +280,6 @@ class API:
                 if page is not batch_page:
                     batch_page[prop] += page[prop]
 
-    def langlinks(
-        self, lllimit: int = 'max', **kwargs: Any
-    ) -> Generator[dict, None, None]:
-        for page_llink in self.query_prop(
-            'langlinks', lllimit=lllimit, **kwargs
-        ):
-            yield page_llink
-
-    def query_meta(self, meta, **kwargs: Any) -> dict:
-        """Post a meta query and return the result .
-
-        Note: Some meta queries require special handling. Use `self.query()`
-            directly if this method cannot handle it properly and there is no
-            other specific method for it.
-
-        https://www.mediawiki.org/wiki/API:Meta
-        """
-        if meta == 'siteinfo':
-            for json in self.query(meta='siteinfo', **kwargs):
-                assert 'batchcomplete' in json
-                assert 'continue' not in json
-                return json['query']
-        for json in self.query(meta=meta, **kwargs):
-            if meta == 'filerepoinfo':
-                meta = 'repos'
-            assert json['batchcomplete'] is True
-            return json['query'][meta]
-
     def recentchanges(
         self, rclimit: int = 'max', **kwargs: Any
     ) -> Generator[dict, None, None]:
@@ -257,6 +289,19 @@ class API:
             list='recentchanges', rclimit=rclimit, **kwargs
         ):
             yield rc
+
+    def revisions(self, **kwargs) -> dict:
+        """https://www.mediawiki.org/wiki/API:Revisions
+
+        If in mode 2 and 'rvlimit' is not specified, 'max' will be used.
+        """
+        if 'rvlimit' not in kwargs and (
+            'rvstart' in (keys := kwargs.keys())
+            or 'rvend' in keys or 'rvlimit' in keys
+        ):  # Mode 2: Get revisions for one given page
+            kwargs['rvlimit'] = 'max'
+        for revisions in self.query_prop('revisions', **kwargs):
+            yield revisions
 
     def siteinfo(self, **kwargs: Any) -> dict:
         """https://www.mediawiki.org/wiki/API:Siteinfo"""
@@ -272,50 +317,6 @@ class API:
         """https://www.mediawiki.org/wiki/API:Logevents"""
         for e in self.query_list('logevents', lelimit=lelimit, **kwargs):
             yield e
-
-    def patrol(self, **kwargs: Any) -> None:
-        """https://www.mediawiki.org/wiki/API:Patrol
-
-        `token` will be added automatically.
-        """
-        self.post(action='patrol', token=self.tokens['patrol'], **kwargs)
-
-    def post(self, **data: Any) -> dict:
-        """Post a request to MW API and return the json response.
-
-        Force format=json, formatversion=2, errorformat=plaintext, and
-        maxlag=self.maxlag.
-        Warn about warnings and raise errors as APIError.
-        """
-        data |= {
-            'format': 'json',
-            'formatversion': '2',
-            'errorformat': 'plaintext',
-            'maxlag': self.maxlag}
-        if self._assert_user is not None:
-            data['assertuser'] = self._assert_user
-        debug('post data: %s', data)
-        resp = self.session.post(self.url, data=data)
-        json = resp.json()
-        debug('json response: %s', json)
-        if 'warnings' in json:
-            warning(pformat(json['warnings']))
-        if 'errors' in json:
-            return self._handle_api_errors(data, resp, json)
-        return json
-
-    def revisions(self, **kwargs) -> dict:
-        """https://www.mediawiki.org/wiki/API:Revisions
-
-        If in mode 2 and 'rvlimit' is not specified, 'max' will be used.
-        """
-        if 'rvlimit' not in kwargs and (
-            'rvstart' in (keys := kwargs.keys())
-            or 'rvend' in keys or 'rvlimit' in keys
-        ):  # Mode 2: Get revisions for one given page
-            kwargs['rvlimit'] = 'max'
-        for revisions in self.query_prop('revisions', **kwargs):
-            yield revisions
 
 
 def load_lgname_lgpass(api_url, username=None) -> tuple:
