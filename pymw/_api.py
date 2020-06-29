@@ -97,7 +97,7 @@ class API:
         retry_after = resp.headers['retry-after']
         warning(f'maxlag error (retrying after {retry_after} seconds)')
         sleep(int(retry_after))
-        return self.post(**data)
+        return self.post(data)
 
     def clear_cache(self) -> None:
         """Clear cached values."""
@@ -130,12 +130,12 @@ class API:
         """
         if lgpassword is None:
             lgname, lgpassword = load_lgname_lgpass(self.url, lgname)
-        json = self.post(
-            action='login',
-            lgname=lgname,
-            lgpassword=lgpassword,
-            lgtoken=self.tokens['login'],
-            **kwargs)
+        json = self.post({
+            'action': 'login',
+            'lgname': lgname,
+            'lgpassword': lgpassword,
+            'lgtoken': self.tokens['login'],
+            **kwargs})
         result = json['login']['result']
         if result == 'Success':
             self.clear_cache()
@@ -150,17 +150,18 @@ class API:
 
     def logout(self) -> None:
         """https://www.mediawiki.org/wiki/API:Logout"""
-        self.post(action='logout', token=self.tokens['csrf'])
+        self.post({'action': 'logout', 'token': self.tokens['csrf']})
         self.clear_cache()
 
-    def patrol(self, **kwargs: Any) -> None:
+    def patrol(self, **kwargs: Any) -> dict:
         """https://www.mediawiki.org/wiki/API:Patrol
 
         `token` will be added automatically.
         """
-        self.post(action='patrol', token=self.tokens['patrol'], **kwargs)
+        return self.post(
+            {'action': 'patrol', 'token': self.tokens['patrol'], **kwargs})
 
-    def post(self, **data: Any) -> dict:
+    def post(self, data: dict) -> dict:
         """Post a request to MW API and return the json response.
 
         Force format=json, formatversion=2, errorformat=plaintext, and
@@ -190,7 +191,7 @@ class API:
             raise NotImplementedError(
                 'rawcontinue is not implemented for query method')
         while True:
-            json = self.post(**data)
+            json = self.post(data)
             continue_ = json.get('continue')
             yield json
             if continue_ is None:
