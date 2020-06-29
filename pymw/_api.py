@@ -275,10 +275,8 @@ class API:
     ) -> Generator[dict, None, None]:
         """https://www.mediawiki.org/wiki/API:RecentChanges"""
         # Todo: somehow support rcgeneraterevisions
-        for rc in self.query_list(
-            list='recentchanges', rclimit=rclimit, **kwargs
-        ):
-            yield rc
+        yield from self.query_list(
+            list='recentchanges', rclimit=rclimit, **kwargs)
 
     def revisions(self, **kwargs) -> dict:
         """https://www.mediawiki.org/wiki/API:Revisions
@@ -305,8 +303,7 @@ class API:
         self, lelimit: int = 'max', **kwargs
     ) -> Generator[dict, None, None]:
         """https://www.mediawiki.org/wiki/API:Logevents"""
-        for e in self.query_list('logevents', lelimit=lelimit, **kwargs):
-            yield e
+        yield from self.query_list('logevents', lelimit=lelimit, **kwargs)
 
 
 def load_lgname_lgpass(api_url, username=None) -> tuple:
