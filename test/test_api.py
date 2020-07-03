@@ -176,7 +176,8 @@ def test_patrol_not_logged_in(post_mock, cleared_api):
         raise AssertionError('APIError was not raised')
     post_mock.assert_called_with(
         'https://www.mediawiki.org/w/api.php',
-        data={'revid': 27040231, 'action': 'patrol', 'token': '+\\', 'format': 'json', 'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5})
+        data={'revid': 27040231, 'action': 'patrol', 'token': '+\\', 'format': 'json', 'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5},
+        files=None)
 
 
 @api_post_patch({'patrol': {'rcid': 1, 'ns': 4, 'title': 'T'}})
