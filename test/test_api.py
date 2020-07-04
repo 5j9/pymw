@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from io import BytesIO
 from pprint import pformat
-from typing import Sequence
 from unittest.mock import call, patch, mock_open
 
 from pytest import fixture, raises
@@ -32,13 +31,15 @@ class FakeResp:
 
 
 def patch_post(obj, attr, call_returns, ):
-    call_returns = iter(call_returns)
+    i = -2
 
     def side_effect(*args, **kwargs):
-        if (call := next(call_returns)) is not any:
+        nonlocal i
+        i += 2
+        if (call := call_returns[i]) is not any:
             assert args == call.args
             assert kwargs == call.kwargs
-        return next(call_returns)
+        return call_returns[i + 1]
 
     return patch.object(obj, attr, side_effect=side_effect)
 
@@ -289,31 +290,33 @@ def test_upload_file_auto_login(login_mock):
     login_mock.assert_called_once_with()
 
 
-# @api_post_patch(
-#     {'upload': {'warnings': {'duplicate-archive': 'F.jpg'}, 'result': 'Continue', 'offset': 3000, 'filekey': 'K'}},
-#     {'upload': {'filekey': 'K.jpg', 'imageinfo': {'CENSORED': ...}, 'result': 'Success', 'warnings': {'duplicate-archive': 'T.jpg'}}},
-#     {'upload': {'filename': 'F.jpg', 'imageinfo': {'CENSORED': ...}, 'result': 'Success'}})
-# def test_upload_chunks(post_mock):
-#     api._assert_user = 'U'
-#     api.tokens['csrf'] = 'T'
-#     bio0 = BytesIO(b'0')
-#     bio1 = BytesIO(b'1')
-#     result = api.upload_chunks(
-#         chunks=(b for b in (0, bio1)),
-#         filename='F.jpg',
-#         filesize=5039,
-#         ignorewarnings=True)
-#     c0, c1, c2 = post_mock.call_args_list
-#     assert c0 == call(
-#             {'action': 'upload', 'token': 'T', 'stash': 1, 'offset': 0, 'filename': 'F.jpg', 'filesize': 5039, 'ignorewarnings': True},
-#             files={'chunk': ('F.jpg', 0)})
-#     assert c1 == call(
-#             {'action': 'upload', 'token': 'T', 'stash': 1, 'offset': 3000, 'filename': 'F.jpg', 'filesize': 5039, 'ignorewarnings': True, 'filekey': 'K', 'format': 'json', 'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5, 'assertuser': 'U'},
-#             files={'chunk': ('F.jpg', bio1)})
-#     assert c2 == call(
-#             {'action': 'upload', 'token': 'T', 'filename': 'F.jpg', 'ignorewarnings': True, 'filekey': 'K.jpg', 'comment': 'testing', 'format': 'json', 'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5, 'assertuser': 'U'},
-#             files=None)
-#     assert result == {'filename': 'F.jpg', 'imageinfo': {'CENSORED': ...}, 'result': 'Success'}
+bio0 = BytesIO(b'0')
+bio1 = BytesIO(b'1')
+
+
+@api_post_patch(
+    call(
+        {'action': 'upload', 'token': 'T', 'stash': 1, 'offset': 0, 'filename': 'F.jpg', 'filesize': 5039, 'ignorewarnings': True},
+        files={'chunk': ('F.jpg', bio0)}),
+    {'upload': {'warnings': {'duplicate-archive': 'F.jpg'}, 'result': 'Continue', 'offset': 3000, 'filekey': 'K'}},
+    call(
+        {'action': 'upload', 'token': 'T', 'stash': 1, 'offset': 3000, 'filename': 'F.jpg', 'filesize': 5039, 'ignorewarnings': True, 'filekey': 'K'},
+        files={'chunk': ('F.jpg', bio1)}),
+    {'upload': {'filekey': 'K.jpg', 'imageinfo': {'CENSORED': ...}, 'result': 'Success', 'warnings': {'duplicate-archive': 'T.jpg'}}},
+    call(
+        {'action': 'upload', 'token': 'T', 'filename': 'F.jpg', 'ignorewarnings': True, 'filekey': 'K.jpg'},
+        files=None),
+    {'upload': {'filename': 'F.jpg', 'imageinfo': {'CENSORED': ...}, 'result': 'Success'}})
+def test_upload_chunks(_):
+    api._assert_user = 'U'
+    api.tokens['csrf'] = 'T'
+
+    result = api.upload_chunks(
+        chunks=(b for b in (bio0, bio1)),
+        filename='F.jpg',
+        filesize=5039,
+        ignorewarnings=True)
+    assert result == {'filename': 'F.jpg', 'imageinfo': {'CENSORED': ...}, 'result': 'Success'}
 
 
 pymw_toml = '''
