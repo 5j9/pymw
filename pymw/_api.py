@@ -367,14 +367,14 @@ class API:
             'filesize': filesize, 'ignorewarnings': ignorewarnings}
         # chunk filename does not matter
         # 'multipart/form-data' header is the default
-        files = {'chunk': (None, next(chunks))}
+        files = {'chunk': (filename, next(chunks))}
         upload = self.upload
         upload_chunk = partial(upload, chunk_params, files=files)
         upload = upload_chunk()  # upload the first chunk
         for chunk in chunks:
             chunk_params['offset'] = upload['offset']
             chunk_params['filekey'] = upload['filekey']
-            files['chunk'] = (None, chunk)
+            files['chunk'] = (filename, chunk)
             upload = upload_chunk()
         # Final upload using the filekey to commit the upload out of the stash
         return self.upload({
