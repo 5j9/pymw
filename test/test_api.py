@@ -271,6 +271,15 @@ def test_upload_file(post_mock):
         files={'file': ('FN.jpg', NotImplemented)})
 
 
+@patch.object(API, 'login')
+def test_upload_file_auto_login(login_mock):
+    login_mock.side_effect = NotImplementedError
+    api._assert_user = None
+    with raises(NotImplementedError):
+        api.upload_file(NotImplemented, 'FN.jpg')
+    login_mock.assert_called_once_with()
+
+
 pymw_toml = '''
 version = 1
 
