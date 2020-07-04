@@ -1,6 +1,7 @@
 from functools import partial
 from pprint import pformat
-from typing import Any, BinaryIO, Generator, Optional, Union
+from typing import Any, BinaryIO, Generator, Iterator, Optional, \
+    Union
 from logging import warning, debug, info
 from pathlib import Path
 from time import sleep
@@ -346,7 +347,7 @@ class API:
             files=files)['upload']
 
     def upload_chunks(
-        self, chunks: Generator[BinaryIO, None, None], filename: str,
+        self, *, chunks: Iterator[BinaryIO], filename: str,
         filesize: Union[int, str], ignorewarnings: bool = None, **params
     ) -> dict:
         """Upload file in chunks using `self.upload`.
@@ -380,7 +381,7 @@ class API:
             'filename': filename, 'ignorewarnings': ignorewarnings,
             'filekey': upload['filekey'], **params})
 
-    def upload_file(self, file: BinaryIO, filename: str, **params):
+    def upload_file(self, *, file: BinaryIO, filename: str, **params):
         """Upload a file using `self.upload`.
 
         :param file: A file-like object to be uploaded using a
