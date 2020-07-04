@@ -193,10 +193,10 @@ class API:
             'maxlag': self.maxlag}
         if self._assert_user is not None:
             data['assertuser'] = self._assert_user
-        debug('API.post:\n\tdata:\n\t\t%s\n\tfiles:\n\t\t%s', data, files)
+        debug('data:\n\t%s\nfiles:\n\t%s', data, files)
         resp = self.session.post(self.url, data=data, files=files)
         json = resp.json()
-        debug('API.post:\n\tresp.json:\n\t\t%s', json)
+        debug('resp.json:\n\t%s', json)
         if 'warnings' in json:
             warning(pformat(json['warnings']))
         if 'errors' in json:
