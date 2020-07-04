@@ -126,7 +126,7 @@ class API:
 
     def login(
         self, lgname: str = None, lgpassword: str = None, **params: Any
-    ) -> None:
+    ) -> dict:
         """Log in and set authentication cookies.
 
         Should only be used in combination with Special:BotPasswords.
@@ -147,11 +147,13 @@ class API:
             'lgpassword': lgpassword,
             'lgtoken': self.tokens['login'],
             **params})
-        result = json['login']['result']
+        login = json['login']
+        result = login['result']
         if result == 'Success':
             self.clear_cache()
-            self._assert_user = lgname
-            return
+            # lgusername == lgname.partition('@')[0]
+            self._assert_user = login['lgusername']
+            return login
         if result == 'WrongToken':
             # token is outdated?
             info(result)
