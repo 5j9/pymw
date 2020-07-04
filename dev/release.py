@@ -72,3 +72,5 @@ finally:
 new_dev_version = release_version.bump_release(index=2).bump_dev()
 update_version(release_version, new_dev_version)
 commit(f'v{str(new_dev_version)}')
+
+check_call(('git', 'push'))
