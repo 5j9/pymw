@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from io import BytesIO
 from pprint import pformat
 from unittest.mock import patch, mock_open
 
@@ -258,6 +259,16 @@ def test_revisions_mode2_no_rvlimit(post_mock):  # auto set rvlimit
         {'ns': 0, 'pageid': 112963, 'revisions': [{'comment': '', 'minor': False, 'parentid': 438023, 'revid': 438026, 'timestamp': '2020-06-25T21:09:52Z', 'user': 'DMaza (WMF)'}, {'comment': '', 'minor': False, 'parentid': 438022, 'revid': 438023, 'timestamp': '2020-06-25T21:08:12Z', 'user': 'DMaza (WMF)'}, {'comment': '1', 'minor': False, 'parentid': 0, 'revid': 438022, 'timestamp': '2020-06-25T21:08:02Z', 'user': 'DMaza (WMF)'}], 'title': 'DmazaTest'}
     ] == [r for r in api.revisions(titles='DmazaTest', rvstart='now')]
     post_mock.assert_called_once_with({'action': 'query', 'prop': 'revisions', 'titles': 'DmazaTest', 'rvstart': 'now', 'rvlimit': 'max'})
+
+
+@api_post_patch({'upload': {'result': 'Warning', 'warnings': {'exists': 'Test.jpg', 'nochange': {'timestamp': '2020-07-04T07:29:07Z'}}, 'filekey': 'tampered.y27er1.18.jpg', 'sessionkey': 'tampered.y27er1.18.jpg'}})
+def test_upload_file(post_mock):
+    api._assert_user = 'James Bond'
+    api.tokens['csrf'] = 'T'
+    api.upload_file(NotImplemented, 'FN.jpg')
+    post_mock.assert_called_once_with(
+        {'action': 'upload', 'token': 'T', 'filename': 'FN.jpg'},
+        files={'file': ('FN.jpg', NotImplemented)})
 
 
 pymw_toml = '''

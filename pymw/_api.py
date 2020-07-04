@@ -179,7 +179,7 @@ class API:
         return self.post(
             {'action': 'patrol', 'token': self.tokens['patrol'], **params})
 
-    def post(self, data: dict, files=None) -> dict:
+    def post(self, data: dict, *, files=None) -> dict:
         """Post a request to MW API and return the json response.
 
         Force format=json, formatversion=2, errorformat=plaintext, and
@@ -193,10 +193,10 @@ class API:
             'maxlag': self.maxlag}
         if self._assert_user is not None:
             data['assertuser'] = self._assert_user
-        debug('post data: %s', data)
+        debug('API.post:\n\tdata:\n\t\t%s\n\tfiles:\n\t\t%s', data, files)
         resp = self.session.post(self.url, data=data, files=files)
         json = resp.json()
-        debug('json response: %s', json)
+        debug('API.post:\n\tresp.json:\n\t\t%s', json)
         if 'warnings' in json:
             warning(pformat(json['warnings']))
         if 'errors' in json:
@@ -329,52 +329,59 @@ class API:
         """
         return self.query_meta('siteinfo', **params)
 
-    def upload_chunks(
-        self, chunks: Generator[BinaryIO, None, None],
-        filename: str, filesize: Union[int, str], ignorewarnings: bool = None,
-        **params
-    ) -> dict:
-        """Upload file in chunks.
+    def upload(self, data, files=None):
+        """Post an action=upload request and return the 'upload' key of resp
 
         Try to login if not already. Add `token` automatically.
+
+        Use `self.upload_file` and `self.upload_chunks`for uploading a file
+        or uploading a file in chunks.
+
+        https://www.mediawiki.org/wiki/API:Upload
+        """
+        if self._assert_user is None:
+            self.login()
+        return self.post(
+            {'action': 'upload', 'token': self.tokens['csrf'], **data},
+            files=files)['upload']
+
+    def upload_chunks(
+        self, chunks: Generator[BinaryIO, None, None], filename: str,
+        filesize: Union[int, str], ignorewarnings: bool = None, **params
+    ) -> dict:
+        """Upload file in chunks using `self.upload`.
+
         This method handles `offset` and `stash` parameters internally, do NOT
         use them.
         :param chunks: A chuck generator.
         :param filename: Target filename.
         :param filesize: Filesize of entire upload.
         :param ignorewarnings: Ignore any warnings.
+
+        https://www.mediawiki.org/wiki/API:Upload
         """
-        if self._assert_user is None:
-            self.login()
-        token = self.tokens['csrf']
         # No need to send the comment, text, and other params with every chunk.
         chunk_params = {
-            'action': 'upload', 'stash': 1, 'offset': 0, 'filename': filename,
-            'filesize': filesize, 'token': token,
-            'ignorewarnings': ignorewarnings}
+            'stash': 1, 'offset': 0, 'filename': filename,
+            'filesize': filesize, 'ignorewarnings': ignorewarnings}
         # chunk filename does not matter
         # 'multipart/form-data' header is the default
         files = {'chunk': (None, next(chunks))}
-        post = self.post
-        chuck_post = partial(post, chunk_params, files=files)
-        upload = chuck_post()['upload']
+        upload = self.upload
+        upload_chunk = partial(upload, chunk_params, files=files)
+        upload = upload_chunk()  # upload the first chunk
         for chunk in chunks:
             chunk_params['offset'] = upload['offset']
             chunk_params['filekey'] = upload['filekey']
             files['chunk'] = (None, chunk)
-            upload = chuck_post()['upload']
+            upload = upload_chunk()
         # Final upload using the filekey to commit the upload out of the stash
-        return post({
-            'action': 'upload', 'filename': filename,
-            'ignorewarnings': ignorewarnings,
+        return self.upload({
+            'filename': filename, 'ignorewarnings': ignorewarnings,
             'filekey': upload['filekey'], **params})
 
-    def upload_file(
-        self, filename: str, file: BinaryIO = None, **params
-    ):
-        """Upload a file.
-
-        Try to login if not already. Add `token` automatically.
+    def upload_file(self, file: BinaryIO, filename: str, **params):
+        """Upload a file using `self.upload`.
 
         :param file: A file-like object to be uploaded using a
             `multipart/form-data` request.
@@ -382,38 +389,8 @@ class API:
 
         https://www.mediawiki.org/wiki/API:Upload
         """
-        if self._assert_user is None:
-            self.login()
-        return self.post({
-            'action': 'upload', 'filename': filename,
-            'token': self.tokens['csrf'], **params}, files={
-            'file': (filename, file, 'multipart/form-data')})
-
-    def upload_status(self, filekey) -> dict:
-        """Only fetch the upload status for the given file key.
-
-        Try to login if not already.
-        Add `token` and 'checkstatus' automatically.
-
-        https://www.mediawiki.org/wiki/API:Upload
-        """
-        if self._assert_user is None:
-            self.login()
-        return self.post({
-            'action': 'upload', 'checkstatus': True, 'filekey': filekey,
-            'token': self.tokens['csrf']})
-
-    def upload_url(self, **params):
-        """Upload a file using URL.
-
-        Try to login if not already. Add `token` automatically.
-
-        https://www.mediawiki.org/wiki/API:Upload
-        """
-        if self._assert_user is None:
-            self.login()
-        return self.post({
-            'action': 'upload', 'token': self.tokens['csrf'], **params})
+        return self.upload({
+            'filename': filename, **params}, files={'file': (filename, file)})
 
     def userinfo(self, **params) -> dict:
         """Get information about the current user.
