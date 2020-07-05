@@ -1,21 +1,12 @@
-from os.path import abspath, dirname, join
-from re import search, MULTILINE
-
 from setuptools import setup
 
 
 with open('README.rst', 'r') as fh:
     long_description = fh.read()
 
-here = abspath(dirname(__file__))
 setup(
     name='pymw',
-    version=search(
-        r"^__version__ = '([^']*)'",
-        open(
-            join(here, 'pymw', '_api.py'),
-            encoding='ascii', errors='ignore').read(),
-        MULTILINE).group(1),
+    version='0.4.2.dev0',
     author='5j9',
     author_email='5j9@users.noreply.github.com',
     description="A thin MediaWiki client using requests.",
