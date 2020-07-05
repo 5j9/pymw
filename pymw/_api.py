@@ -9,7 +9,7 @@ from time import sleep
 from requests import Session, Response
 from tomlkit import parse as toml_parse
 
-__version__ = '0.5.0'
+__version__ = '0.5.1.dev0'
 
 
 PARSED_TOML: Optional[str] = None
