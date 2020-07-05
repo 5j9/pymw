@@ -1,2 +1,1 @@
-from ._api import API, APIError, LoginError, __version__
-
+from ._api import API, APIError, LoginError, PYMWError, __version__
