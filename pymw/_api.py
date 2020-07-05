@@ -111,12 +111,6 @@ class API:
         del self.tokens.api  # cyclic reference
         self.session.close()
 
-    def langlinks(
-        self, lllimit: int = 'max', **params: Any
-    ) -> Generator[dict, None, None]:
-        params['lllimit'] = lllimit
-        yield from self.query_prop('langlinks', params)
-
     def login(
         self, lgname: str = None, lgpassword: str = None, **params: Any
     ) -> dict:
@@ -257,7 +251,7 @@ class API:
             return json['query'][meta]
 
     def query_prop(
-        self, prop: str, params: dict
+        self, prop: str, **params: Any
     ) -> Generator[dict, None, None]:
         """Post a prop query, handle batchcomplete, and yield the results.
 
@@ -289,22 +283,6 @@ class API:
                 batch_page = batch_setdefault(page_id, page)
                 if page is not batch_page:
                     batch_page[prop] += page[prop]
-
-    def revisions(self, **params) -> dict:
-        """Get revision information.
-
-        If in mode 2 and 'rvlimit' is not specified, 'max' will be used.
-        `rvcontinue` will be handled internally.
-
-        https://www.mediawiki.org/wiki/API:Revisions
-        """
-        if 'rvlimit' not in params and (
-            'rvstart' in (keys := params.keys())
-            or 'rvend' in keys or 'rvlimit' in keys
-        ):  # Mode 2: Get revisions for one given page
-            params['rvlimit'] = 'max'
-        for revisions in self.query_prop('revisions', params):
-            yield revisions
 
     def upload(self, data: dict, files=None) -> dict:
         """Post an action=upload request and return the 'upload' key of resp

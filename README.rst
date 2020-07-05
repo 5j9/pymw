@@ -32,7 +32,7 @@ Notable features
 - Handles `query continuations`_.
 - Handles batchcomplete_ signals for prop queries and yeilds the results as soon as a batch is complete.
 - Configurable maxlag_. Waits as the  API recommends and then retries.
-- Some convenient methods for accessing common API calls, e.g. for recentchanges_, login_, upload_, and siteinfo_.
+- Some convenient methods for accessing common API calls, e.g. for login_, upload_.
 - Lightweight. ``pymw`` is a thin wrapper. Method signatures are very similar to the parameters in an actual API URL. You can consult MediaWiki's documentation if in doubt about what a parameter does.
 
 .. _MediaWiki: https://www.mediawiki.org/

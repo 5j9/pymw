@@ -130,18 +130,18 @@ def test_siteinfo(post_mock):
     call({'action': 'query', 'prop': 'langlinks', 'lllimit': 1, 'titles': 'Main Page', 'llcontinue': '15580374|bg', 'continue': '||'}),
     {'batchcomplete': True, 'query': {'pages': [{'pageid': 15580374, 'ns': 0, 'title': 'Main Page', 'langlinks': [{'lang': 'zh', 'title': ''}]}]}})
 def test_langlinks(_):
-    titles_langlinks = [page_ll for page_ll in api.langlinks(
-        titles='Main Page', lllimit=1)]
+    titles_langlinks = [page_ll for page_ll in api.query_prop(
+        'langlinks', titles='Main Page', lllimit=1)]
     assert len(titles_langlinks) == 1
     assert titles_langlinks[0] == {'pageid': 15580374, 'ns': 0, 'title': 'Main Page', 'langlinks': [{'lang': 'ar', 'title': ''}, {'lang': 'zh', 'title': ''}]}
 
 
 @api_post_patch(
-    call({'action': 'query', 'prop': 'langlinks', 'lllimit': 'max', 'titles': 'Main Page'}),
+    call({'action': 'query', 'prop': 'langlinks', 'titles': 'Main Page'}),
     {'batchcomplete': True, 'query': {'pages': [{'pageid': 1182793, 'ns': 0, 'title': 'Main Page'}]}, 'limits': {'langlinks': 500}})
 def test_lang_links_title_not_exists(post_mock):
-    titles_langlinks = [page_ll for page_ll in api.langlinks(
-        titles='Main Page')]
+    titles_langlinks = [page_ll for page_ll in api.query_prop(
+        'langlinks', titles='Main Page')]
     assert len(titles_langlinks) == 1
     post_mock.assert_called_once()
     assert titles_langlinks[0] == {'pageid': 1182793, 'ns': 0, 'title': 'Main Page'}
@@ -259,16 +259,16 @@ def test_revisions_mode13(_):
     assert [
         {'pageid': 91945, 'ns': 0, 'title': 'A', 'revisions': [{'revid': 28594859, 'parentid': 28594843, 'minor': False, 'user': '5.119.128.223', 'anon': True, 'timestamp': '2020-03-31T11:38:15Z', 'comment': 'c1'}]},
         {'pageid': 91946, 'ns': 0, 'title': 'B', 'revisions': [{'revid': 28199506, 'parentid': 25110220, 'minor': False, 'user': '2.147.31.47', 'anon': True, 'timestamp': '2020-02-08T14:53:12Z', 'comment': 'c2'}]}
-    ] == [r for r in api.revisions(titles='a|b')]
+    ] == [r for r in api.query_prop('revisions', titles='a|b')]
 
 
 @api_post_patch(
-    call({'action': 'query', 'prop': 'revisions', 'titles': 'DmazaTest', 'rvstart': 'now', 'rvlimit': 'max'}),
+    call({'action': 'query', 'prop': 'revisions', 'titles': 'DmazaTest', 'rvstart': 'now'}),
     {'batchcomplete': True, 'query': {'pages': [{'pageid': 112963, 'ns': 0, 'title': 'DmazaTest', 'revisions': [{'revid': 438026, 'parentid': 438023, 'minor': False, 'user': 'DMaza (WMF)', 'timestamp': '2020-06-25T21:09:52Z', 'comment': ''}, {'revid': 438023, 'parentid': 438022, 'minor': False, 'user': 'DMaza (WMF)', 'timestamp': '2020-06-25T21:08:12Z', 'comment': ''}, {'revid': 438022, 'parentid': 0, 'minor': False, 'user': 'DMaza (WMF)', 'timestamp': '2020-06-25T21:08:02Z', 'comment': '1'}]}]}, 'limits': {'revisions': 500}})
 def test_revisions_mode2_no_rvlimit(post_mock):  # auto set rvlimit
     assert [
         {'ns': 0, 'pageid': 112963, 'revisions': [{'comment': '', 'minor': False, 'parentid': 438023, 'revid': 438026, 'timestamp': '2020-06-25T21:09:52Z', 'user': 'DMaza (WMF)'}, {'comment': '', 'minor': False, 'parentid': 438022, 'revid': 438023, 'timestamp': '2020-06-25T21:08:12Z', 'user': 'DMaza (WMF)'}, {'comment': '1', 'minor': False, 'parentid': 0, 'revid': 438022, 'timestamp': '2020-06-25T21:08:02Z', 'user': 'DMaza (WMF)'}], 'title': 'DmazaTest'}
-    ] == [r for r in api.revisions(titles='DmazaTest', rvstart='now')]
+    ] == [r for r in api.query_prop('revisions', titles='DmazaTest', rvstart='now')]
     post_mock.assert_called_once()
 
 
