@@ -34,7 +34,8 @@ class TokenManager(dict):
         super().__init__()
 
     def __missing__(self, key):
-        v = self[key] = self.api.query_meta('tokens', type=key)[f'{key}token']
+        v = self[key] = self.api.query_meta(
+            'tokens', {'type': key})[f'{key}token']
         return v
 
 
@@ -115,14 +116,13 @@ class API:
         """Return meta information about image repositories on the wiki.
 
         https://www.mediawiki.org/wiki/API:Filerepoinfo"""
-        return self.query_meta('filerepoinfo', **params)
+        return self.query_meta('filerepoinfo', params)
 
     def langlinks(
         self, lllimit: int = 'max', **params: Any
     ) -> Generator[dict, None, None]:
-        for page_llink in self.query_prop(
-            'langlinks', lllimit=lllimit, **params
-        ):
+        params['lllimit'] = lllimit
+        for page_llink in self.query_prop('langlinks', params):
             yield page_llink
 
     def login(
@@ -142,12 +142,10 @@ class API:
         """
         if lgpassword is None:
             lgname, lgpassword = load_lgname_lgpass(self.url, lgname)
-        json = self.post({
-            'action': 'login',
-            'lgname': lgname,
-            'lgpassword': lgpassword,
-            'lgtoken': self.tokens['login'],
-            **params})
+        params |= {
+            'action': 'login', 'lgname': lgname, 'lgpassword': lgpassword,
+            'lgtoken': self.tokens['login']}
+        json = self.post(params)
         login = json['login']
         result = login['result']
         if result == 'Success':
@@ -159,7 +157,7 @@ class API:
             # token is outdated?
             info(result)
             del self.tokens['login']
-            return self.login(lgname, lgpassword, **params)
+            return self.login(**params)
         raise LoginError(pformat(json))
 
     def logout(self) -> None:
@@ -177,8 +175,8 @@ class API:
 
         https://www.mediawiki.org/wiki/API:Patrol
         """
-        return self.post(
-            {'action': 'patrol', 'token': self.tokens['patrol'], **params})
+        params |= {'action': 'patrol', 'token': self.tokens['patrol']}
+        return self.post(params)
 
     def post(self, data: dict, *, files=None) -> dict:
         """Post a request to MW API and return the json response.
@@ -217,7 +215,7 @@ class API:
                 return
             data |= continue_
 
-    def query(self, **params) -> Generator[dict, None, None]:
+    def query(self, params: dict) -> Generator[dict, None, None]:
         """Post an API query and yield results.
 
         Handle continuations.
@@ -230,18 +228,19 @@ class API:
         yield from self.post_and_continue(params)
 
     def query_list(
-        self, list: str, **params: Any
+        self, list: str, params: dict
     ) -> Generator[dict, None, None]:
         """Post a list query and yield the results.
 
         https://www.mediawiki.org/wiki/API:Lists
         """
-        for json in self.query(list=list, **params):
+        params['list'] = list
+        for json in self.query(params):
             assert json['batchcomplete'] is True  # T84977#5471790
             for item in json['query'][list]:
                 yield item
 
-    def query_meta(self, meta, **params: Any) -> dict:
+    def query_meta(self, meta, params: dict) -> dict:
         """Post a meta query and return the result .
 
         Note: Some meta queries require special handling. Use `self.query()`
@@ -250,19 +249,20 @@ class API:
 
         https://www.mediawiki.org/wiki/API:Meta
         """
+        params['meta'] = meta
         if meta == 'siteinfo':
-            for json in self.query(meta='siteinfo', **params):
+            for json in self.query(params):
                 assert 'batchcomplete' in json
                 assert 'continue' not in json
                 return json['query']
-        for json in self.query(meta=meta, **params):
+        for json in self.query(params):
             if meta == 'filerepoinfo':
                 meta = 'repos'
             assert json['batchcomplete'] is True
             return json['query'][meta]
 
     def query_prop(
-        self, prop: str, **params: Any
+        self, prop: str, params: dict
     ) -> Generator[dict, None, None]:
         """Post a prop query, handle batchcomplete, and yield the results.
 
@@ -272,7 +272,8 @@ class API:
         batch_get = batch.get
         batch_clear = batch.clear
         batch_setdefault = batch.setdefault
-        for json in self.query(prop=prop, **params):
+        params['prop'] = prop
+        for json in self.query(params):
             pages = json['query']['pages']
             if 'batchcomplete' in json:
                 if not batch:
@@ -304,8 +305,8 @@ class API:
         https://www.mediawiki.org/wiki/API:RecentChanges
         """
         # Todo: somehow support rcgeneraterevisions
-        yield from self.query_list(
-            list='recentchanges', rclimit=rclimit, **params)
+        params['rclimit'] = rclimit
+        yield from self.query_list('recentchanges', params)
 
     def revisions(self, **params) -> dict:
         """Get revision information.
@@ -320,7 +321,7 @@ class API:
             or 'rvend' in keys or 'rvlimit' in keys
         ):  # Mode 2: Get revisions for one given page
             params['rvlimit'] = 'max'
-        for revisions in self.query_prop('revisions', **params):
+        for revisions in self.query_prop('revisions', params):
             yield revisions
 
     def siteinfo(self, **params: Any) -> dict:
@@ -328,9 +329,9 @@ class API:
 
         https://www.mediawiki.org/wiki/API:Siteinfo
         """
-        return self.query_meta('siteinfo', **params)
+        return self.query_meta('siteinfo', params)
 
-    def upload(self, data, files=None):
+    def upload(self, data: dict, files=None):
         """Post an action=upload request and return the 'upload' key of resp
 
         Try to login if not already. Add `token` automatically.
@@ -342,9 +343,8 @@ class API:
         """
         if self._assert_user is None:
             self.login()
-        return self.post(
-            {'action': 'upload', 'token': self.tokens['csrf'], **data},
-            files=files)['upload']
+        data |= {'action': 'upload', 'token': self.tokens['csrf']}
+        return self.post(data, files=files)['upload']
 
     def upload_chunks(
         self, *, chunks: Iterator[BinaryIO], filename: str,
@@ -377,9 +377,10 @@ class API:
             files['chunk'] = (filename, chunk)
             upload = upload_chunk()
         # Final upload using the filekey to commit the upload out of the stash
-        return self.upload({
+        params |= {
             'filename': filename, 'ignorewarnings': ignorewarnings,
-            'filekey': upload['filekey'], **params})
+            'filekey': upload['filekey']}
+        return self.upload(params)
 
     def upload_file(self, *, file: BinaryIO, filename: str, **params):
         """Upload a file using `self.upload`.
@@ -390,15 +391,15 @@ class API:
 
         https://www.mediawiki.org/wiki/API:Upload
         """
-        return self.upload({
-            'filename': filename, **params}, files={'file': (filename, file)})
+        params['filename'] = filename
+        return self.upload(params, files={'file': (filename, file)})
 
     def userinfo(self, **params) -> dict:
         """Get information about the current user.
 
         https://www.mediawiki.org/wiki/API:Userinfo
         """
-        return self.query_meta('userinfo', **params)
+        return self.query_meta('userinfo', params)
 
     def logevents(
         self, lelimit: int = 'max', **params
@@ -407,7 +408,8 @@ class API:
 
         https://www.mediawiki.org/wiki/API:Logevents
         """
-        yield from self.query_list('logevents', lelimit=lelimit, **params)
+        params['lelimit'] = lelimit
+        yield from self.query_list('logevents', params)
 
 
 def load_lgname_lgpass(api_url, username=None) -> tuple:

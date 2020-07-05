@@ -110,7 +110,7 @@ def test_recentchanges(_):
     call(api.url, data={'meta': 'tokens', 'type': 'watch', 'action': 'query', 'format': 'json', 'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5}, files=None),
     {}, {'batchcomplete': True, 'query': {'tokens': {'watchtoken': '+\\'}}})
 def test_maxlag(_, warning_mock, cleared_api):
-    tokens = cleared_api.query_meta('tokens', type='watch')
+    tokens = cleared_api.query_meta('tokens', {'type': 'watch'})
     assert tokens == {'watchtoken': '+\\'}
     warning_mock.assert_called_with('maxlag error (retrying after 5 seconds)')
 
@@ -207,12 +207,12 @@ def test_bad_patrol_token(_):
     with patch.object(
             API, 'query_meta', return_value={'patroltoken': 'N'}) as m:
         assert api.tokens['patrol'] == 'N'
-    m.assert_called_once_with('tokens', type='patrol')
+    m.assert_called_once_with('tokens', {'type': 'patrol'})
 
 
 def test_rawcontinue():
     try:
-        for _ in api.query(rawcontinue=''):
+        for _ in api.query({'rawcontinue': ''}):
             pass  # pragma: nocover
     except NotImplementedError:
         pass
