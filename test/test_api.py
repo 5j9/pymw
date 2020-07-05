@@ -97,7 +97,7 @@ def test_unknown_login_result(post_mock):
     call({'list': 'recentchanges', 'rcprop': 'timestamp', 'rclimit': 1, 'action': 'query', 'rccontinue': '20190908072938|4484663', 'continue': '-||'}),
     {'batchcomplete': True, 'query': {'recentchanges': [{'type': 'categorize', 'timestamp': '2019-09-08T07:29:38Z'}]}})
 def test_recentchanges(_):
-    assert [rc for rc in api.recentchanges(rclimit=1, rcprop='timestamp')] == [
+    assert [rc for rc in api.query_list('recentchanges', rclimit=1, rcprop='timestamp')] == [
             {'type': 'log', 'timestamp': '2019-09-08T07:30:00Z'},
             {'type': 'categorize', 'timestamp': '2019-09-08T07:29:38Z'}]
 
@@ -110,7 +110,7 @@ def test_recentchanges(_):
     call(api.url, data={'meta': 'tokens', 'type': 'watch', 'action': 'query', 'format': 'json', 'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5}, files=None),
     {}, {'batchcomplete': True, 'query': {'tokens': {'watchtoken': '+\\'}}})
 def test_maxlag(_, warning_mock, cleared_api):
-    tokens = cleared_api.query_meta('tokens', {'type': 'watch'})
+    tokens = cleared_api.query_meta('tokens', type='watch')
     assert tokens == {'watchtoken': '+\\'}
     warning_mock.assert_called_with('maxlag error (retrying after 5 seconds)')
 
@@ -119,7 +119,7 @@ def test_maxlag(_, warning_mock, cleared_api):
     call({'action': 'query', 'meta': 'siteinfo', 'siprop': 'protocols'}),
     {'batchcomplete': True, 'query': {'protocols': ['http://', 'https://']}})
 def test_siteinfo(post_mock):
-    si = api.siteinfo(siprop='protocols')
+    si = api.query_meta('siteinfo', siprop='protocols')
     assert si == {'protocols': ['http://', 'https://']}
     post_mock.assert_called_once()
 
@@ -151,7 +151,7 @@ def test_lang_links_title_not_exists(post_mock):
     call({'action': 'query', 'meta': 'userinfo'}),
     {'batchcomplete': True, 'query': {'userinfo': {'id': 0, 'name': '1.1.1.1', 'anon': True}}})
 def test_userinfo(post_mock):
-    assert api.userinfo() == {'id': 0, 'name': '1.1.1.1', 'anon': True}
+    assert api.query_meta('userinfo') == {'id': 0, 'name': '1.1.1.1', 'anon': True}
     post_mock.assert_called_once()
 
 
@@ -159,7 +159,8 @@ def test_userinfo(post_mock):
     call({'action': 'query', 'meta': 'filerepoinfo', 'friprop': 'displayname'}),
     {'batchcomplete': True, 'query': {'repos': [{'displayname': 'Commons'}, {'displayname': 'Wikipedia'}]}})
 def test_filerepoinfo(post_mock):
-    assert api.filerepoinfo(friprop='displayname') == [{'displayname': 'Commons'}, {'displayname': 'Wikipedia'}]
+    assert api.query_meta('filerepoinfo', friprop='displayname') ==\
+           [{'displayname': 'Commons'}, {'displayname': 'Wikipedia'}]
     post_mock.assert_called_once()
 
 
@@ -207,7 +208,7 @@ def test_bad_patrol_token(_):
     with patch.object(
             API, 'query_meta', return_value={'patroltoken': 'N'}) as m:
         assert api.tokens['patrol'] == 'N'
-    m.assert_called_once_with('tokens', {'type': 'patrol'})
+    m.assert_called_once_with('tokens', type='patrol')
 
 
 def test_rawcontinue():
@@ -247,7 +248,7 @@ def test_csrf_token(post_mock):
     call({'action': 'query', 'list': 'logevents', 'lelimit': 1, 'leprop': 'timestamp', 'ledir': 'newer', 'leend': '2004-12-23T18:41:10Z'}),
     {'batchcomplete': True, 'query': {'logevents': [{'timestamp': '2004-12-23T18:41:10Z'}]}})
 def test_logevents(post_mock):
-    events = [e for e in api.logevents(1, leprop='timestamp', ledir='newer', leend='2004-12-23T18:41:10Z')]
+    events = [e for e in api.query_list('logevents', lelimit=1, leprop='timestamp', ledir='newer', leend='2004-12-23T18:41:10Z')]
     assert len(events) == 1
     assert events[0] == {'timestamp': '2004-12-23T18:41:10Z'}
     post_mock.assert_called_once()

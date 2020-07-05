@@ -34,8 +34,7 @@ class TokenManager(dict):
         super().__init__()
 
     def __missing__(self, key):
-        v = self[key] = self.api.query_meta(
-            'tokens', {'type': key})[f'{key}token']
+        v = self[key] = self.api.query_meta('tokens', type=key)[f'{key}token']
         return v
 
 
@@ -112,18 +111,11 @@ class API:
         del self.tokens.api  # cyclic reference
         self.session.close()
 
-    def filerepoinfo(self, **params: Any) -> dict:
-        """Return meta information about image repositories on the wiki.
-
-        https://www.mediawiki.org/wiki/API:Filerepoinfo"""
-        return self.query_meta('filerepoinfo', params)
-
     def langlinks(
         self, lllimit: int = 'max', **params: Any
     ) -> Generator[dict, None, None]:
         params['lllimit'] = lllimit
-        for page_llink in self.query_prop('langlinks', params):
-            yield page_llink
+        yield from self.query_prop('langlinks', params)
 
     def login(
         self, lgname: str = None, lgpassword: str = None, **params: Any
@@ -220,6 +212,8 @@ class API:
         """Post an API query and yield results.
 
         Handle continuations.
+        `self.query_list`, `self.query_meta`, and `self.query_prop` should
+        be preferred to this method.
 
         https://www.mediawiki.org/wiki/API:Query
         """
@@ -229,7 +223,7 @@ class API:
         yield from self.post_and_continue(params)
 
     def query_list(
-        self, list: str, params: dict
+        self, list: str, **params: Any
     ) -> Generator[dict, None, None]:
         """Post a list query and yield the results.
 
@@ -241,7 +235,7 @@ class API:
             for item in json['query'][list]:
                 yield item
 
-    def query_meta(self, meta, params: dict) -> dict:
+    def query_meta(self, meta, **params: Any) -> dict:
         """Post a meta query and return the result .
 
         Note: Some meta queries require special handling. Use `self.query()`
@@ -296,19 +290,6 @@ class API:
                 if page is not batch_page:
                     batch_page[prop] += page[prop]
 
-    def recentchanges(
-        self, rclimit: int = 'max', **params: Any
-    ) -> Generator[dict, None, None]:
-        """Enumerate recent changes.
-
-        Continuation will be handled internally.
-
-        https://www.mediawiki.org/wiki/API:RecentChanges
-        """
-        # Todo: somehow support rcgeneraterevisions
-        params['rclimit'] = rclimit
-        yield from self.query_list('recentchanges', params)
-
     def revisions(self, **params) -> dict:
         """Get revision information.
 
@@ -324,13 +305,6 @@ class API:
             params['rvlimit'] = 'max'
         for revisions in self.query_prop('revisions', params):
             yield revisions
-
-    def siteinfo(self, **params: Any) -> dict:
-        """Return general information about the site.
-
-        https://www.mediawiki.org/wiki/API:Siteinfo
-        """
-        return self.query_meta('siteinfo', params)
 
     def upload(self, data: dict, files=None) -> dict:
         """Post an action=upload request and return the 'upload' key of resp
@@ -394,23 +368,6 @@ class API:
         """
         params['filename'] = filename
         return self.upload(params, files={'file': (filename, file)})
-
-    def userinfo(self, **params) -> dict:
-        """Get information about the current user.
-
-        https://www.mediawiki.org/wiki/API:Userinfo
-        """
-        return self.query_meta('userinfo', params)
-
-    def logevents(
-        self, lelimit: int = 'max', **params
-    ) -> Generator[dict, None, None]:
-        """Get events from logs.
-
-        https://www.mediawiki.org/wiki/API:Logevents
-        """
-        params['lelimit'] = lelimit
-        yield from self.query_list('logevents', params)
 
 
 def load_lgname_lgpass(api_url, username=None) -> tuple:
