@@ -167,6 +167,7 @@ class API:
         """
         self.post({'action': 'logout', 'token': self.tokens['csrf']})
         self.clear_cache()
+        # action logout returns empty dict on success, thus no return value
 
     def patrol(self, **params: Any) -> dict:
         """Patrol a page or revision.
@@ -331,7 +332,7 @@ class API:
         """
         return self.query_meta('siteinfo', params)
 
-    def upload(self, data: dict, files=None):
+    def upload(self, data: dict, files=None) -> dict:
         """Post an action=upload request and return the 'upload' key of resp
 
         Try to login if not already. Add `token` automatically.
@@ -382,7 +383,7 @@ class API:
             'filekey': upload['filekey']}
         return self.upload(params)
 
-    def upload_file(self, *, file: BinaryIO, filename: str, **params):
+    def upload_file(self, *, file: BinaryIO, filename: str, **params) -> dict:
         """Upload a file using `self.upload`.
 
         :param file: A file-like object to be uploaded using a
