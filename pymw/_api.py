@@ -242,13 +242,12 @@ class API:
         params['meta'] = meta
         if meta == 'siteinfo':
             for json in self.query(params):
-                assert 'batchcomplete' in json
                 assert 'continue' not in json
                 return json['query']
         for json in self.query(params):
             if meta == 'filerepoinfo':
                 meta = 'repos'
-            assert json['batchcomplete'] is True
+            assert 'continue' not in json
             return json['query'][meta]
 
     def query_prop(
