@@ -58,15 +58,16 @@ class API:
         :param maxlag: see:
             https://www.mediawiki.org/wiki/Manual:Maxlag_parameter
         :param user_agent: A string to be used as the User-Agent header value.
-            If not provided a default value of f'mwpy/v{__version__}'} will be
-            used, however that's not enough most of the time. see:
-            https://meta.wikimedia.org/wiki/User-Agent_policy and
+            If not provided a default value of f'mwpy/{__version__}'} will be
+            used, however that does not fully meet MediaWiki's API etiquette:
             https://www.mediawiki.org/wiki/API:Etiquette#The_User-Agent_header
+            See also: https://meta.wikimedia.org/wiki/User-Agent_policy
         """
         self._assert_user = None
         self.maxlag = maxlag
         s = self.session = Session()
-        s.headers.update({'User-Agent': user_agent or f'mwpy/v{__version__}'})
+        s.headers['User-Agent'] = \
+            f'mwpy/{__version__}' if user_agent is None else user_agent
         self.tokens = TokenManager(self)
         self.url = url
 
