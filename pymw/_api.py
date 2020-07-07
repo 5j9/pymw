@@ -78,7 +78,8 @@ class API:
         for error in errors:
             if (
                 handler := getattr(
-                    self, f'_handle_{error["code"]}_error', None)
+                    self, f"_handle_{error['code'].replace('-', '_')}_error",
+                    None)
             ) is not None and (
                 handler_result := handler(resp, data, error)
             ) is not None:
@@ -93,6 +94,11 @@ class API:
         if error['module'] == 'patrol':
             info('invalidating patrol token cache')
             del self.tokens['patrol']
+
+    def _handle_login_required_error(self, _, data: dict, __):
+        warning('"login-required" error occurred')
+        self.login()
+        return self.post(data)
 
     def _handle_maxlag_error(
         self, resp: Response, data: dict, _

@@ -1,5 +1,5 @@
-from dataclasses import dataclass
 from io import BytesIO
+from itertools import groupby, takewhile
 from pprint import pformat
 from unittest.mock import call, patch, mock_open
 
@@ -8,7 +8,8 @@ from pytest import fixture, raises
 from pymw import API, LoginError, APIError
 
 
-api = API('https://www.mediawiki.org/w/api.php')
+url = 'https://www.mediawiki.org/w/api.php'
+api = API(url)
 
 
 @fixture
@@ -21,10 +22,12 @@ def fake_sleep(_):
     return
 
 
-@dataclass
 class FakeResp:
-    headers: dict
-    _json: dict
+    __slots__ = ('_json', 'headers')
+
+    def __init__(self, json, headers={}):
+        self._json = json
+        self.headers = headers
 
     def json(self):
         return self._json
@@ -49,11 +52,21 @@ def api_post_patch(*call_returns):
 
 
 def session_post_patch(*call_header_returns):
-    chr = iter(call_header_returns)
-    call_returns = []
-    for call, headers, return_ in zip(chr, chr, chr):
-        call_returns += (call, FakeResp(headers, return_))
-    return patch_post(api.session, 'post', call_returns)
+    call_responses = []
+    iterator = iter(call_header_returns)
+    call = next(iterator)
+    while call is not None:
+        headers_or_json = next(iterator)
+        json_or_call = next(iterator, None)
+        if type(json_or_call) is dict:
+            response = FakeResp(json=json_or_call, headers=headers_or_json)
+            call_responses += (call, response)
+            call = next(iterator, None)
+        else:
+            response = FakeResp(json=headers_or_json)
+            call_responses += (call, response)
+            call = json_or_call
+    return patch_post(api.session, 'post', call_responses)
 
 
 @api_post_patch(
@@ -105,9 +118,15 @@ def test_recentchanges(_):
 @patch('pymw._api.sleep', fake_sleep)
 @patch('pymw._api.warning')
 @session_post_patch(
-    call(api.url, data={'action': 'query', 'errorformat': 'plaintext', 'format': 'json', 'formatversion': '2', 'maxlag': 5, 'meta': 'tokens', 'type': 'watch'}, files=None),
+    call(url, data={
+        'action': 'query', 'errorformat': 'plaintext', 'format': 'json',
+        'formatversion': '2', 'maxlag': 5, 'meta': 'tokens', 'type': 'watch'
+    }, files=None),
     {'retry-after': '5'}, {'errors': [{'code': 'maxlag', 'text': 'Waiting for 10.64.16.7: 0.80593395233154 seconds lagged.', 'data': {'host': '10.64.16.7', 'lag': 0.805933952331543, 'type': 'db'}, 'module': 'main'}], 'docref': 'See https://www.mediawiki.org/w/api.php for API usage. Subscribe to the mediawiki-api-announce mailing list at &lt;https://lists.wikimedia.org/mailman/listinfo/mediawiki-api-announce&gt; for notice of API deprecations and breaking changes.', 'servedby': 'mw1225'},
-    call(api.url, data={'meta': 'tokens', 'type': 'watch', 'action': 'query', 'format': 'json', 'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5}, files=None),
+    call(url, data={
+        'meta': 'tokens', 'type': 'watch', 'action': 'query', 'format': 'json',
+        'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5
+    }, files=None),
     {}, {'batchcomplete': True, 'query': {'tokens': {'watchtoken': '+\\'}}})
 def test_maxlag(_, warning_mock, cleared_api):
     tokens = cleared_api.query_meta('tokens', type='watch')
@@ -174,10 +193,10 @@ def test_context_manager():
 
 @session_post_patch(
     any, {}, {'batchcomplete': True, 'query': {'tokens': {'patroltoken': '+\\'}}},
-    call(
-        api.url,
-        data={'revid': 27040231, 'action': 'patrol', 'token': '+\\', 'format': 'json', 'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5},
-        files=None), {}, {'errors': [{'code': 'permissiondenied', 'text': 'T', 'module': 'patrol'}], 'docref': 'D', 'servedby': 'mw1233'})
+    call(url, data={
+        'revid': 27040231, 'action': 'patrol', 'token': '+\\', 'format':
+            'json', 'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5
+    }, files=None), {}, {'errors': [{'code': 'permissiondenied', 'text': 'T', 'module': 'patrol'}], 'docref': 'D', 'servedby': 'mw1233'})
 def test_patrol_not_logged_in(_, cleared_api):
     try:
         cleared_api.patrol(revid=27040231)
@@ -351,3 +370,30 @@ def test_assert_login(post_mock):
     api._assert_user = 'USER'
     api.post({})
     assert post_mock.mock_calls[0].kwargs['data']['assertuser'] == 'USER'
+
+
+@patch('pymw._api.Path.open', pymw_toml_mock)
+@session_post_patch(
+    call(url, data={
+        'notfilter': '!read', 'meta': 'notifications', 'action': 'query',
+        'errorformat': 'plaintext', 'format': 'json', 'formatversion': '2',
+        'maxlag': 5,}, files=None),
+    {'errors': [{'code': 'login-required', 'text': 'You must be logged in.', 'module': 'query+notifications'}], 'docref': '', 'servedby': 'mw1341'},
+    call(url, data={
+        'type': 'login', 'meta': 'tokens', 'action': 'query', 'format': 'json',
+        'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5}, files=None),
+    {'batchcomplete': True, 'query': {'tokens': {'logintoken': 'T1'}}},
+    call(url, data={
+        'action': 'login', 'lgname': 'username@toolname', 'lgpassword':
+            'bot_password', 'lgtoken': 'T1', 'format': 'json', 'formatversion':
+            '2', 'errorformat': 'plaintext', 'maxlag': 5}, files=None),
+    {'login': {'result': 'Success', 'lguserid': 1, 'lgusername': 'username'}},
+    call(url, data={
+        'notfilter': '!read', 'meta': 'notifications', 'action': 'query',
+        'format': 'json', 'formatversion': '2', 'errorformat': 'plaintext',
+        'maxlag': 5, 'assertuser': 'username'}, files=None),
+    {'batchcomplete': True, 'query': {'notifications': {'list': [], 'continue': None}}},
+)
+def test_handle_login_required(_, cleared_api):
+    r = api.query_meta('notifications', notfilter='!read')
+    assert r == {'list': [], 'continue': None}
