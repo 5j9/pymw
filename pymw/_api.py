@@ -356,7 +356,7 @@ def load_lgname_lgpass(api_url, username=None) -> tuple:
         ) as f:
             pymw_toml = f.read()
         PARSED_TOML = toml_parse(pymw_toml)
-    login = PARSED_TOML[api_url]['login']
+    login = PARSED_TOML[api_url]['login'].copy()
     if username is None:
         return *login.popitem(),
     return username, login[username]
