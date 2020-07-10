@@ -1,5 +1,4 @@
 from io import BytesIO
-from itertools import groupby, takewhile
 from pprint import pformat
 from unittest.mock import call, patch, mock_open
 
@@ -25,9 +24,9 @@ def fake_sleep(_):
 class FakeResp:
     __slots__ = ('_json', 'headers')
 
-    def __init__(self, json, headers={}):
+    def __init__(self, json, headers=None):
         self._json = json
-        self.headers = headers
+        self.headers = {} if headers is None else headers
 
     def json(self):
         return self._json
@@ -66,7 +65,7 @@ def session_post_patch(*call_header_returns):
             response = FakeResp(json=headers_or_json)
             call_responses += (call, response)
             call = json_or_call
-    return patch_post(api.session, 'post', call_responses)
+    return patch_post(api.session, 'request', call_responses)
 
 
 @api_post_patch(
@@ -118,12 +117,12 @@ def test_recentchanges(_):
 @patch('pymw._api.sleep', fake_sleep)
 @patch('pymw._api.warning')
 @session_post_patch(
-    call(url, data={
+    call('POST', url, data={
         'action': 'query', 'errorformat': 'plaintext', 'format': 'json',
         'formatversion': '2', 'maxlag': 5, 'meta': 'tokens', 'type': 'watch'
     }, files=None),
     {'retry-after': '5'}, {'errors': [{'code': 'maxlag', 'text': 'Waiting for 10.64.16.7: 0.80593395233154 seconds lagged.', 'data': {'host': '10.64.16.7', 'lag': 0.805933952331543, 'type': 'db'}, 'module': 'main'}], 'docref': 'See https://www.mediawiki.org/w/api.php for API usage. Subscribe to the mediawiki-api-announce mailing list at &lt;https://lists.wikimedia.org/mailman/listinfo/mediawiki-api-announce&gt; for notice of API deprecations and breaking changes.', 'servedby': 'mw1225'},
-    call(url, data={
+    call('POST', url, data={
         'meta': 'tokens', 'type': 'watch', 'action': 'query', 'format': 'json',
         'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5
     }, files=None),
@@ -193,7 +192,7 @@ def test_context_manager():
 
 @session_post_patch(
     any, {}, {'batchcomplete': True, 'query': {'tokens': {'patroltoken': '+\\'}}},
-    call(url, data={
+    call('POST', url, data={
         'revid': 27040231, 'action': 'patrol', 'token': '+\\', 'format':
             'json', 'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5
     }, files=None), {}, {'errors': [{'code': 'permissiondenied', 'text': 'T', 'module': 'patrol'}], 'docref': 'D', 'servedby': 'mw1233'})
@@ -374,21 +373,21 @@ def test_assert_login(post_mock):
 
 @patch('pymw._api.Path.open', pymw_toml_mock)
 @session_post_patch(
-    call(url, data={
+    call('POST', url, data={
         'notfilter': '!read', 'meta': 'notifications', 'action': 'query',
         'errorformat': 'plaintext', 'format': 'json', 'formatversion': '2',
         'maxlag': 5,}, files=None),
     {'errors': [{'code': 'login-required', 'text': 'You must be logged in.', 'module': 'query+notifications'}], 'docref': '', 'servedby': 'mw1341'},
-    call(url, data={
+    call('POST', url, data={
         'type': 'login', 'meta': 'tokens', 'action': 'query', 'format': 'json',
         'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5}, files=None),
     {'batchcomplete': True, 'query': {'tokens': {'logintoken': 'T1'}}},
-    call(url, data={
+    call('POST', url, data={
         'action': 'login', 'lgname': 'username@toolname', 'lgpassword':
             'bot_password', 'lgtoken': 'T1', 'format': 'json', 'formatversion':
             '2', 'errorformat': 'plaintext', 'maxlag': 5}, files=None),
     {'login': {'result': 'Success', 'lguserid': 1, 'lgusername': 'username'}},
-    call(url, data={
+    call('POST', url, data={
         'notfilter': '!read', 'meta': 'notifications', 'action': 'query',
         'format': 'json', 'formatversion': '2', 'errorformat': 'plaintext',
         'maxlag': 5, 'assertuser': 'username'}, files=None),

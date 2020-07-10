@@ -187,7 +187,7 @@ class API:
         if self._assert_user is not None:
             data['assertuser'] = self._assert_user
         debug('data:\n\t%s\nfiles:\n\t%s', data, files)
-        resp = self.session.post(self.url, data=data, files=files)
+        resp = self.session.request('POST', self.url, data=data, files=files)
         json = resp.json()
         debug('resp.json:\n\t%s', json)
         if 'warnings' in json:
