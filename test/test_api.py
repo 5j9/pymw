@@ -504,3 +504,25 @@ page2 = {
         'limits': {'allpages': 5000}, 'query': {'pages': [incomplete_page2]}})
 def test_complete_in_the_middle_of_batch(_):
     assert next(api.query_prop('revisions')) == page2
+
+
+page3 = {'ns': 0, 'pageid': 1844356, 'revisions': [{
+    'slots': {'main': {
+        'content': '', 'contentformat': 'text/x-wiki',
+        'contentmodel': 'wikitext'}}}], 'title': 'Getopt'}
+
+
+@api_post_patch(
+    any, {
+        'continue': {
+            'continue': 'gapcontinue||', 'gapcontinue': 'Antinatalism',
+            'rvcontinue': '1844356|28824240'},
+        'query': {'pages': [{
+            'ns': 0, 'pageid': 1844356, 'title': 'Getopt'}, page2]}},
+    any, {
+        'batchcomplete': True, 'continue': {
+            'continue': 'gapcontinue||', 'gapcontinue': 'ISO3166-2:AD'},
+        'query': {'pages': [page3, incomplete_page2]}})
+def test_page_in_last_batch(_):
+    page = next(api.query_prop('revisions'))
+    assert page is page3

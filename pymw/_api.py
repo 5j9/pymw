@@ -271,35 +271,35 @@ class API:
 
         https://www.mediawiki.org/wiki/API:Properties
         """
-        batch = {}
-        batch_clear = batch.clear
-        batch_setdefault = batch.setdefault
         params['prop'] = prop
+        batch = None
         for json in self.query(params):
             if (query := json.get('query')) is None:
                 continue
             pages = query['pages']
             if 'batchcomplete' in json:
-                if not batch:
+                if batch is None:
                     for page in pages:
                         yield page
                     continue
-                for page in pages:
-                    page_id = page['pageid']
-                    batch_page = batch[page_id]
-                    if (page_prop := page.get(prop)) is not None:
-                        batch_page[prop] += page_prop
-                        yield batch_page
+                for page, batch_page in zip(pages, batch):
+                    if (pp := page.get(prop)) is not None:
+                        if (bp := batch_page.setdefault(prop, pp)) is not pp:
+                            bp += pp
+                            yield batch_page
+                        else:
+                            yield page
                     else:
                         yield batch_page
-                batch_clear()
+                batch = None
                 continue
-            for page in pages:
-                if (page_prop := page.get(prop)) is not None:
-                    page_id = page['pageid']
-                    batch_page = batch_setdefault(page_id, page)
-                    if batch_page is not page:
-                        batch[page_id][prop] += page_prop
+            if batch is None:
+                batch = pages
+                continue
+            for page, batch_page in zip(pages, batch):
+                if (pp := page.get(prop)) is not None:
+                    if (bp := batch_page.setdefault(prop, pp)) is not pp:
+                        bp += pp
 
     def upload(self, data: dict, files=None) -> dict:
         """Post an action=upload request and return the 'upload' key of resp
