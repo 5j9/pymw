@@ -274,7 +274,6 @@ class API:
         https://www.mediawiki.org/wiki/API:Properties
         """
         batch = {}
-        batch_get = batch.get
         batch_clear = batch.clear
         batch_setdefault = batch.setdefault
         params['prop'] = prop
@@ -289,19 +288,20 @@ class API:
                     continue
                 for page in pages:
                     page_id = page['pageid']
-                    batch_page = batch_get(page_id)
+                    batch_page = batch[page_id]
                     if (page_prop := page.get(prop)) is not None:
-                        if (batch_prop := batch_page.get(prop)) is not None:
-                            batch_prop += page_prop
-                            yield batch_page
-                        else:
-                            yield page
+                        batch_page[prop] += page_prop
+                        yield batch_page
                     else:
                         yield batch_page
                 batch_clear()
                 continue
             for page in pages:
-                batch_setdefault(page['pageid'], page)
+                if (page_prop := page.get(prop)) is not None:
+                    page_id = page['pageid']
+                    batch_page = batch_setdefault(page_id, page)
+                    if batch_page is not page:
+                        batch[page_id][prop] += page_prop
 
     def upload(self, data: dict, files=None) -> dict:
         """Post an action=upload request and return the 'upload' key of resp

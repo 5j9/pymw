@@ -474,3 +474,33 @@ c1 = {
 def test_remove_old_continues_from_data(_):
     for _ in api.post_and_continue({}):
         pass
+
+
+incomplete_page2 = {'ns': 0, 'pageid': 2393444, 'title': 'آ س رایو ناگار'}
+page2 = {
+    'ns': 0, 'pageid': 2393444, 'revisions': [{'slots': {'main': {
+        'content': '', 'contentformat': 'text/x-wiki',
+        'contentmodel': 'wikitext'}}}],
+    'title': 'آ س رایو ناگار'}
+
+
+@api_post_patch(
+    any, {
+        'continue': {
+            'continue': 'gapcontinue||',
+            'gapcontinue': 'Q_(ابهام\u200cزدایی)',
+            'rvcontinue': '2393444|28481387'},
+        'limits': {'allpages': 5000}, 'query': {'pages': [incomplete_page2]}},
+    any, {
+        'continue': {
+            'continue': 'gapcontinue||',
+            'gapcontinue': 'Q_(ابهام\u200cزدایی)',
+            'rvcontinue': '2393444|28481387'},
+        'limits': {'allpages': 5000},
+        'query': {'pages': [page2]}},
+    any, {
+        'batchcomplete': True, 'continue': {
+            'continue': 'gapcontinue||', 'gapcontinue': 'آئودی_لو_مان_کواترو'},
+        'limits': {'allpages': 5000}, 'query': {'pages': [incomplete_page2]}})
+def test_complete_in_the_middle_of_batch(_):
+    assert next(api.query_prop('revisions')) == page2
