@@ -201,13 +201,23 @@ class API:
         if 'rawcontinue' in data:
             raise NotImplementedError(
                 'rawcontinue is not implemented for query method')
+        prev_continue = None
+        data_pop = data.pop
         while True:
             json = self.post(data)
-            continue_ = json.get('continue')
             yield json
-            if continue_ is None:
+            if (continue_ := json.get('continue')) is None:
                 return
+            if prev_continue is None:
+                data |= continue_
+                prev_continue = continue_
+                continue
+            # remove or update any prev_continue key in data
+            for k in prev_continue:
+                if k not in continue_:
+                    data_pop(k)
             data |= continue_
+            prev_continue = continue_
 
     def query(self, params: dict) -> Generator[dict, None, None]:
         """Post an API query and yield results.
@@ -269,7 +279,9 @@ class API:
         batch_setdefault = batch.setdefault
         params['prop'] = prop
         for json in self.query(params):
-            pages = json['query']['pages']
+            if (query := json.get('query')) is None:
+                continue
+            pages = query['pages']
             if 'batchcomplete' in json:
                 if not batch:
                     for page in pages:
@@ -280,8 +292,14 @@ class API:
                     batch_page = batch_get(page_id)
                     if batch_page is None:
                         yield page
-                    batch_page[prop] += page[prop]
-                    yield batch_page
+                    if (page_prop := page.get(prop)) is not None:
+                        if (batch_prop := batch_page.get(prop)) is not None:
+                            batch_prop += page_prop
+                            yield batch_page
+                        else:
+                            yield page
+                    else:
+                        yield batch_page
                 batch_clear()
                 continue
             for page in pages:

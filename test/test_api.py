@@ -143,10 +143,19 @@ def test_siteinfo(post_mock):
 
 
 @api_post_patch(
-    call({'action': 'query', 'prop': 'langlinks', 'lllimit': 1, 'titles': 'Main Page'}),
-    {'continue': {'llcontinue': '15580374|bg', 'continue': '||'}, 'query': {'pages': [{'pageid': 15580374, 'ns': 0, 'title': 'Main Page', 'langlinks': [{'lang': 'ar', 'title': ''}]}]}},
-    call({'action': 'query', 'prop': 'langlinks', 'lllimit': 1, 'titles': 'Main Page', 'llcontinue': '15580374|bg', 'continue': '||'}),
-    {'batchcomplete': True, 'query': {'pages': [{'pageid': 15580374, 'ns': 0, 'title': 'Main Page', 'langlinks': [{'lang': 'zh', 'title': ''}]}]}})
+    call({
+        'action': 'query', 'prop': 'langlinks', 'lllimit': 1,
+        'titles': 'Main Page'}),
+    {'continue': {'llcontinue': '15580374|bg', 'continue': '||'}, 'query': {
+        'pages': [{
+            'pageid': 15580374, 'ns': 0, 'title': 'Main Page',
+            'langlinks': [{'lang': 'ar', 'title': ''}]}]}},
+    call({
+        'action': 'query', 'prop': 'langlinks', 'lllimit': 1,
+        'titles': 'Main Page', 'llcontinue': '15580374|bg', 'continue': '||'}),
+    {'batchcomplete': True, 'query': {'pages': [{
+        'pageid': 15580374, 'ns': 0, 'title': 'Main Page',
+        'langlinks': [{'lang': 'zh', 'title': ''}]}]}})
 def test_langlinks(_):
     titles_langlinks = [page_ll for page_ll in api.query_prop(
         'langlinks', titles='Main Page', lllimit=1)]
@@ -376,7 +385,7 @@ def test_assert_login(post_mock):
     call('POST', url, data={
         'notfilter': '!read', 'meta': 'notifications', 'action': 'query',
         'errorformat': 'plaintext', 'format': 'json', 'formatversion': '2',
-        'maxlag': 5,}, files=None),
+        'maxlag': 5}, files=None),
     {'errors': [{'code': 'login-required', 'text': 'You must be logged in.', 'module': 'query+notifications'}], 'docref': '', 'servedby': 'mw1341'},
     call('POST', url, data={
         'type': 'login', 'meta': 'tokens', 'action': 'query', 'format': 'json',
@@ -396,3 +405,72 @@ def test_assert_login(post_mock):
 def test_handle_login_required(_, cleared_api):
     r = api.query_meta('notifications', notfilter='!read')
     assert r == {'list': [], 'continue': None}
+
+
+@api_post_patch(
+    any, {'batchcomplete': True, 'continue': {
+        'gapcontinue': '!!', 'continue': 'gapcontinue||'}},
+    any, {'batchcomplete': True, 'continue': {
+        'gapcontinue': '!!!', 'continue': 'gapcontinue||'}, 'query': {
+        'pages': [{'pageid': 3632887, 'ns': 0, 'title': '!!', 'revisions': [{
+            'slots': {'main': {
+                'contentmodel': 'wikitext', 'contentformat': 'text/x-wiki',
+                'content': ...}}}]}]}})
+def test_empty_pages_in_prop_query(_):
+    # should not raise KeyError: 'query'
+    next(api.query_prop('revisions'))
+
+
+page = {
+    'ns': 0,
+    'pageid': 8988,
+    'revisions': [{'slots': {'main': {
+        'content': '', 'contentformat': 'text/x-wiki',
+        'contentmodel': 'wikitext'}}}],
+    'title': 'E (عدد)'}
+
+
+@api_post_patch(
+    any, {'continue': {
+        'continue': 'gapcontinue||', 'gapcontinue': 'Antinatalism',
+        'rvcontinue': '1844356|28824240'}, 'limits': {'allpages': 5000},
+        'query': {'pages': [page]}},
+    any, {'batchcomplete': True, 'continue': {
+        'continue': 'gapcontinue||', 'gapcontinue': 'ISO3166-2:AD'},
+        'limits': {'allpages': 5000}, 'query': {'pages': [{
+            'ns': 0, 'pageid': 8988, 'title': 'E (عدد)'}]}})
+def test_prop_complete_first(_):
+    # used to give KeyError: 'revisions'
+    assert next(api.query_prop('revisions')) is page
+
+
+@api_post_patch(
+    any, {
+        'continue': {
+            'continue': 'gapcontinue||', 'gapcontinue': 'ISO3166-2:AD'},
+        'limits': {'allpages': 5000}, 'query': {
+            'pages': [{
+                'ns': 0, 'pageid': 8988, 'title': 'E (عدد)'}]}},
+    any, {
+        'batchcomplete': True,
+        'continue': {
+            'continue': 'gapcontinue||', 'gapcontinue': 'Antinatalism',
+            'rvcontinue': '1844356|28824240'},
+        'limits': {'allpages': 5000},
+        'query': {'pages': [page]}})
+def test_prop_incomplete_first(_):
+    # used to give KeyError: 'revisions'
+    assert next(api.query_prop('revisions')) == page
+
+
+c2 = {'continue': 'gapcontinue||', 'gapcontinue': 'ISO3166-2:AD'}
+c1 = {
+    'continue': 'gapcontinue||', 'gapcontinue': 'Antinatalism',
+    'rvcontinue': '1844356|28824240'}
+
+
+@api_post_patch(
+    call({}), {'continue': c1}, call(c1), {'continue': c2}, call(c2), {})
+def test_remove_old_continues_from_data(_):
+    for _ in api.post_and_continue({}):
+        pass
