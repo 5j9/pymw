@@ -290,8 +290,6 @@ class API:
                 for page in pages:
                     page_id = page['pageid']
                     batch_page = batch_get(page_id)
-                    if batch_page is None:
-                        yield page
                     if (page_prop := page.get(prop)) is not None:
                         if (batch_prop := batch_page.get(prop)) is not None:
                             batch_prop += page_prop
@@ -303,10 +301,7 @@ class API:
                 batch_clear()
                 continue
             for page in pages:
-                page_id = page['pageid']
-                batch_page = batch_setdefault(page_id, page)
-                if page is not batch_page:
-                    batch_page[prop] += page[prop]
+                batch_setdefault(page['pageid'], page)
 
     def upload(self, data: dict, files=None) -> dict:
         """Post an action=upload request and return the 'upload' key of resp
