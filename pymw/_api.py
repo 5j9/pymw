@@ -209,15 +209,13 @@ class API:
             if (continue_ := json.get('continue')) is None:
                 return
             if prev_continue is None:
-                data |= continue_
-                prev_continue = continue_
+                data |= (prev_continue := continue_)
                 continue
             # remove or update any prev_continue key in data
             for k in prev_continue:
                 if k not in continue_:
                     data_pop(k)
-            data |= continue_
-            prev_continue = continue_
+            data |= (prev_continue := continue_)
 
     def query(self, params: dict) -> Generator[dict, None, None]:
         """Post an API query and yield results.
