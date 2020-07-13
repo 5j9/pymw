@@ -527,6 +527,7 @@ def test_page_in_last_batch(_):
     page = next(api.query_prop('revisions'))
     assert page is page3
 
+
 @api_post_patch(
     any, {
         'continue': {'llcontinue': '288753|en', 'continue': '||'},
