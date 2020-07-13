@@ -526,3 +526,31 @@ page3 = {'ns': 0, 'pageid': 1844356, 'revisions': [{
 def test_page_in_last_batch(_):
     page = next(api.query_prop('revisions'))
     assert page is page3
+
+@api_post_patch(
+    any, {
+        'continue': {'llcontinue': '288753|en', 'continue': '||'},
+        'query': {'pages': [{
+            'pageid': 288753, 'ns': 0, 'title': 'شیران',
+            'langlinks': [
+                {'lang': 'ar', 'title': 'شيران'},
+                {'lang': 'arz', 'title': 'شيران'}]}]}},
+    any, {
+        'continue': {'llcontinue': '288753|zh-min-nan', 'continue': '||'},
+        'query': {'pages': [{
+            'pageid': 288753, 'ns': 0, 'title': 'شیران', 'langlinks': [
+                {'lang': 'en', 'title': 'Shiran, Ardabil'},
+                {'lang': 'ms', 'title': 'Shiran, Ardabil'}]}]}},
+    any, {'batchcomplete': True, 'query': {'pages': [
+        {'pageid': 288753, 'ns': 0, 'title': 'شیران', 'langlinks': [
+            {'lang': 'zh-min-nan', 'title': 'Shiran (Ardabil)'}]}]}})
+def test_batch_prop_extend(_):
+    assert next(api.query_prop(
+        'langlinks', llprop='', lllimit=2, titles='شیران')
+    ) == {
+        'pageid': 288753, 'ns': 0, 'title': 'شیران', 'langlinks': [
+            {'lang': 'ar', 'title': 'شيران'},
+            {'lang': 'arz', 'title': 'شيران'},
+            {'lang': 'en', 'title': 'Shiran, Ardabil'},
+            {'lang': 'ms', 'title': 'Shiran, Ardabil'},
+            {'lang': 'zh-min-nan', 'title': 'Shiran (Ardabil)'}]}
