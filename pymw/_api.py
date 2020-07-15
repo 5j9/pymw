@@ -71,6 +71,9 @@ class API:
         self.tokens = TokenManager(self)
         self.url = url
 
+    def __repr__(self):
+        return f'{type(self).__name__}({repr(self.url)})'
+
     def _handle_api_errors(
         self, data: dict, resp: Response, json: dict
     ) -> dict:

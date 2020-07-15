@@ -555,3 +555,7 @@ def test_batch_prop_extend(_):
             {'lang': 'en', 'title': 'Shiran, Ardabil'},
             {'lang': 'ms', 'title': 'Shiran, Ardabil'},
             {'lang': 'zh-min-nan', 'title': 'Shiran (Ardabil)'}]}
+
+
+def test_repr():
+    assert repr(api) == f'API({repr(url)})'
