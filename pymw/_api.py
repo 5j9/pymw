@@ -40,7 +40,7 @@ class TokenManager(dict):
 
 # noinspection PyShadowingBuiltins
 class API:
-    __slots__ = 'url', 'session', 'maxlag', 'tokens', '_assert_user'
+    __slots__ = '_url', 'session', 'maxlag', 'tokens', '_assert_user', '_post'
 
     def __enter__(self) -> 'API':
         return self
@@ -69,10 +69,11 @@ class API:
         s.headers['User-Agent'] = \
             f'mwpy/{__version__}' if user_agent is None else user_agent
         self.tokens = TokenManager(self)
-        self.url = url
+        self._url = url
+        self._post = partial(s.request, 'POST', url)
 
     def __repr__(self):
-        return f'{type(self).__name__}({repr(self.url)})'
+        return f'{type(self).__name__}({repr(self._url)})'
 
     def _handle_api_errors(
         self, data: dict, resp: Response, json: dict
@@ -137,7 +138,7 @@ class API:
         https://www.mediawiki.org/wiki/API:Login
         """
         if lgpassword is None:
-            lgname, lgpassword = load_lgname_lgpass(self.url, lgname)
+            lgname, lgpassword = load_lgname_lgpass(self._url, lgname)
         params |= {
             'action': 'login', 'lgname': lgname, 'lgpassword': lgpassword,
             'lgtoken': self.tokens['login']}
@@ -190,7 +191,7 @@ class API:
         if self._assert_user is not None:
             data['assertuser'] = self._assert_user
         debug('data:\n\t%s\nfiles:\n\t%s', data, files)
-        resp = self.session.request('POST', self.url, data=data, files=files)
+        resp = self._post(data=data, files=files)
         json = resp.json()
         debug('resp.json:\n\t%s', json)
         if 'warnings' in json:
@@ -366,6 +367,10 @@ class API:
         """
         params['filename'] = filename
         return self.upload(params, files={'file': (filename, file)})
+
+    @property
+    def url(self):
+        return self._url
 
 
 def load_lgname_lgpass(api_url, username=None) -> tuple:
