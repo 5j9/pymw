@@ -206,7 +206,6 @@ class API:
             raise NotImplementedError(
                 'rawcontinue is not implemented for query method')
         prev_continue = None
-        data_pop = data.pop
         while True:
             json = self.post(data)
             yield json
@@ -215,10 +214,9 @@ class API:
             if prev_continue is None:
                 data |= (prev_continue := continue_)
                 continue
-            # remove or update any prev_continue key in data
-            for k in prev_continue:
-                if k not in continue_:
-                    data_pop(k)
+            # Remove or update any prev_continue key in data.
+            for k in prev_continue.keys() - continue_.keys():
+                del data[k]
             data |= (prev_continue := continue_)
 
     def query(self, params: dict) -> Generator[dict, None, None]:
