@@ -1,7 +1,7 @@
 from functools import partial
 from pprint import pformat
-from typing import Any, BinaryIO, Generator, Iterator, Optional, \
-    Union
+from typing import Any, BinaryIO, Generator, Iterable, Iterator, Optional, \
+    Sequence, Union
 from logging import warning, debug, info
 from pathlib import Path
 from time import sleep
@@ -379,7 +379,8 @@ def load_lgname_lgpass(api_url, username=None) -> tuple:
         ) as f:
             pymw_toml = f.read()
         PARSED_TOML = toml_parse(pymw_toml)
-    login = PARSED_TOML[api_url]['login'].copy()
+    login = PARSED_TOML[api_url]['login']
     if username is None:
-        return *login.popitem(),
+        # noinspection PyTypeChecker
+        return next(login.items())
     return username, login[username]
