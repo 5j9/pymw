@@ -378,9 +378,8 @@ def load_lgname_lgpass(api_url, username=None) -> tuple:
             'r', encoding='utf8'
         ) as f:
             pymw_toml = f.read()
-        PARSED_TOML = toml_parse(pymw_toml)
+        PARSED_TOML: dict[str] = dict(toml_parse(pymw_toml))
     login = PARSED_TOML[api_url]['login']
     if username is None:
-        # noinspection PyTypeChecker
         return next(login.items())
     return username, login[username]
