@@ -12,7 +12,7 @@ from tomlkit import parse as toml_parse
 __version__ = '0.6.2.dev0'
 
 
-PARSED_TOML: Optional[str] = None
+TOML_DICT: Optional[dict] = None
 
 
 class PYMWError(RuntimeError):
@@ -372,14 +372,14 @@ class API:
 
 
 def load_lgname_lgpass(api_url, username=None) -> tuple:
-    global PARSED_TOML
-    if PARSED_TOML is None:
+    global TOML_DICT
+    if TOML_DICT is None:
         with (Path('~').expanduser() / '.pymw.toml').open(
             'r', encoding='utf8'
         ) as f:
             pymw_toml = f.read()
-        PARSED_TOML: dict[str] = dict(toml_parse(pymw_toml))
-    login = PARSED_TOML[api_url]['login']
+        TOML_DICT = dict(toml_parse(pymw_toml))
+    login = TOML_DICT[api_url]['login']
     if username is None:
         return next(login.items())
     return username, login[username]
