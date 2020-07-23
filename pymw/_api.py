@@ -1,7 +1,8 @@
+from fnmatch import fnmatch
 from functools import partial
 from pprint import pformat
 from typing import Any, BinaryIO, Generator, Iterable, Iterator, Optional, \
-    Sequence, Union
+    Union
 from logging import warning, debug, info
 from pathlib import Path
 from time import sleep
@@ -371,7 +372,7 @@ class API:
         return self._url
 
 
-def load_lgname_lgpass(api_url, username=None) -> tuple:
+def load_lgname_lgpass(api_url, username=None) -> tuple[str, str]:
     global TOML_DICT
     if TOML_DICT is None:
         with (Path('~').expanduser() / '.pymw.toml').open(
@@ -379,7 +380,11 @@ def load_lgname_lgpass(api_url, username=None) -> tuple:
         ) as f:
             pymw_toml = f.read()
         TOML_DICT = dict(toml_parse(pymw_toml))
-    login = TOML_DICT[api_url]['login']
+    if (url_config := TOML_DICT.get(api_url)) is None:
+        for url_pattern, url_config in TOML_DICT.items():
+            if fnmatch(api_url, url_pattern):
+                break
+    login = url_config['login']
     if username is None:
         return next(login.items())
     return username, login[username]

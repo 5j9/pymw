@@ -25,6 +25,10 @@ Create a ``.pymw.toml`` file in your home directory with the following content f
     ['https://test.wikipedia.org/w/api.php'.login]
     '<Username@Special:BotPasswords>' = '<BotPassword>'
 
+    # glob patterns are supported
+    ['https://*.wikipedia.org/w/api.php'.login]
+    '<Username>' = '<BotPassword>'
+
 
 Notable features
 ----------------

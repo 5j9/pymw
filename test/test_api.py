@@ -5,6 +5,7 @@ from unittest.mock import call, patch, mock_open
 from pytest import fixture, raises
 
 from pymw import API, LoginError, APIError
+from pymw._api import load_lgname_lgpass
 
 
 url = 'https://www.mediawiki.org/w/api.php'
@@ -352,6 +353,9 @@ version = 1
 
 ['https://www.mediawiki.org/w/api.php'.login]
 'username@toolname' = 'bot_password'
+
+['https://*.wikipedia.org/w/api.php'.login]
+'wp_user' = 'wp_pass'
 '''
 pymw_toml_mock = mock_open(read_data=pymw_toml)
 
@@ -566,3 +570,9 @@ def test_url_property():
 
 def test_repr():
     assert repr(api) == f'API({repr(url)})'
+
+
+@patch('pymw._api.Path.open', pymw_toml_mock)
+def test_glob_pattern_load_lgname_lgpass():
+    assert load_lgname_lgpass('https://en.wikipedia.org/w/api.php') \
+        == ('wp_user', 'wp_pass')
