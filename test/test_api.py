@@ -621,3 +621,7 @@ def test_notloggedin_error(_post_mock, cleared_api):
         'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5,
         'token': watch_token, 'unwatch': True})
     assert r is watch_response
+
+
+def test_token_repr():
+    assert f"{Token('type', 'value')!r}" == "Token('type', 'value')"
