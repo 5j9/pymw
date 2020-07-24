@@ -28,14 +28,31 @@ class LoginError(PYMWError):
     pass
 
 
+class Token(str):
+
+    __slots__ = 'token_type', 'value'
+
+    def __new__(cls, token_type, value):
+        return super().__new__(cls, value)
+
+    def __init__(self, token_type, value):
+        super().__init__()
+        self.value = value
+        self.token_type = token_type
+
+    def __repr__(self):
+        return f'{type(self).__name__}({self.token_type!r}, {self.value!r})'
+
+
 class TokenManager(dict):
 
     def __init__(self, api: 'API'):
         self.api = api
         super().__init__()
 
-    def __missing__(self, key):
-        v = self[key] = self.api.query_meta('tokens', type=key)[f'{key}token']
+    def __missing__(self, token_type) -> Token:
+        v = self[token_type] = Token(token_type, self.api.query_meta(
+            'tokens', type=token_type)[f'{token_type}token'])
         return v
 
 
@@ -100,8 +117,10 @@ class API:
             info('invalidating patrol token cache')
             del self.tokens['patrol']
 
-    def _handle_login_required_error(self, _, data: dict, __):
-        warning('"login-required" error occurred')
+    def _handle_login_required_error(
+        self, _: Response, data: dict, __: dict
+    ):
+        warning('"login-required" error occurred; trying to login...')
         self.login()
         return self.post(data)
 
@@ -111,6 +130,15 @@ class API:
         retry_after = resp.headers['retry-after']
         warning(f'maxlag error (retrying after {retry_after} seconds)')
         sleep(int(retry_after))
+        return self.post(data)
+
+    def _handle_notloggedin_error(
+        self, _: Response, data: dict, __: dict
+    ):
+        warning('"notloggedin" error occurred; trying to login...')
+        self.login()
+        if (token := data.get('token')) is not None:
+            data['token'] = self.tokens[token.token_type]
         return self.post(data)
 
     def clear_cache(self) -> None:

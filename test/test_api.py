@@ -5,7 +5,8 @@ from unittest.mock import call, patch, mock_open
 from pytest import fixture, raises
 
 from pymw import API, LoginError, APIError
-from pymw._api import load_lgname_lgpass
+# noinspection PyProtectedMember
+from pymw._api import Token, load_lgname_lgpass
 
 
 url = 'https://www.mediawiki.org/w/api.php'
@@ -576,3 +577,47 @@ def test_repr():
 def test_glob_pattern_load_lgname_lgpass():
     assert load_lgname_lgpass('https://en.wikipedia.org/w/api.php') \
         == ('wp_user', 'wp_pass')
+
+
+watch_response = {'batchcomplete': True, 'watch': [{'title': '0', 'ns': 0, 'unwatched': True}, {'title': '1', 'ns': 0, 'unwatched': True}]}
+
+
+@session_post_patch(
+    call(data={
+        'action': 'watch', 'titles': '0|1', 'format': 'json',
+        'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5,
+        'token': Token('watch', '+\\'), 'unwatch': True}, files=None),
+    {'errors': [{
+        'code': 'notloggedin',
+        'text': 'Please log in to view or edit items on your watchlist.',
+        'module': 'watch'}], 'docref': '', 'servedby': 'mw1342'},
+    call(data={
+        'type': 'login', 'meta': 'tokens', 'action': 'query', 'format': 'json',
+        'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5
+    }, files=None), {'batchcomplete': True, 'query': {'tokens': {
+        'logintoken': 'LGT+\\'}}},
+    call(data={
+        'action': 'login', 'lgname': 'username@toolname',
+        'lgpassword': 'bot_password', 'lgtoken': Token('login', 'LGT+\\'),
+        'format': 'json', 'formatversion': '2', 'errorformat': 'plaintext',
+        'maxlag': 5}, files=None),
+    {'login': {'result': 'Success', 'lguserid': 1, 'lgusername': 'username'}},
+    call(data={
+        'type': 'watch', 'meta': 'tokens', 'action': 'query', 'format': 'json',
+        'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5,
+        'assertuser': 'username'}, files=None),
+    {'batchcomplete': True, 'query': {'tokens': {'watchtoken': 'LIWT+\\'}}},
+    call(data={
+        'action': 'watch', 'titles': '0|1', 'format': 'json',
+        'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5,
+        'token': Token('watch', 'LIWT+\\'),
+        'unwatch': True, 'assertuser': 'username'}, files=None),
+    watch_response,)
+@patch('pymw._api.Path.open', pymw_toml_mock)
+def test_notloggedin_error(_post_mock, cleared_api):
+    watch_token = Token('watch', '+\\')
+    r = cleared_api.post({
+        'action': 'watch', 'titles': '0|1', 'format': 'json',
+        'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5,
+        'token': watch_token, 'unwatch': True})
+    assert r is watch_response
