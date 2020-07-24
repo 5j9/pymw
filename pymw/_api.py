@@ -1,7 +1,7 @@
 from fnmatch import fnmatch
 from functools import partial
 from pprint import pformat
-from typing import Any, BinaryIO, Generator, Iterable, Iterator, Optional, \
+from typing import Any, BinaryIO, Generator, Iterator, Optional, \
     Union
 from logging import warning, debug, info
 from pathlib import Path
@@ -74,7 +74,7 @@ class API:
         self._post = partial(s.request, 'POST', url)
 
     def __repr__(self):
-        return f'{type(self).__name__}({repr(self._url)})'
+        return f'{type(self).__name__}({self._url!r})'
 
     def _handle_api_errors(
         self, data: dict, resp: Response, json: dict
