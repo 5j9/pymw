@@ -271,7 +271,7 @@ class API:
                 for i in range(0, len(param_values), limit):
                     data[param] = '|'.join(param_values[i:i + limit])
                     yield from self.post_and_continue(data)
-                return
+                return  # pragma: nocover
             yield json
             if (continue_ := json.get('continue')) is None:
                 return
