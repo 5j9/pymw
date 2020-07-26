@@ -17,15 +17,29 @@ TOML_DICT: Optional[dict] = None
 
 
 class PYMWError(RuntimeError):
+    __slots__ = ()
     pass
 
 
 class APIError(PYMWError):
+    __slots__ = ()
     pass
 
 
 class LoginError(PYMWError):
+    __slots__ = ()
     pass
+
+
+class TooManyValuesError(APIError):
+
+    __slots__ = 'error'
+
+    def __init__(self, error):
+        self.error = error
+
+    def __getitem__(self, item):
+        return self.error[item]
 
 
 class Token(str):
@@ -141,6 +155,12 @@ class API:
             data['token'] = self.tokens[token.token_type]
         return self.post(data)
 
+    def _handle_toomanyvalues_error(
+        self, resp: Response, data: dict, error: dict
+    ):
+        # handling could be simplified if T258469 gets implemented.
+        raise TooManyValuesError(error)
+
     def clear_cache(self) -> None:
         """Clear cached values."""
         self.tokens.clear()
@@ -236,7 +256,22 @@ class API:
                 'rawcontinue is not implemented for query method')
         prev_continue = None
         while True:
-            json = self.post(data)
+            try:
+                json = self.post(data)
+            except TooManyValuesError as e:
+                param = (text := e['text'])[  # T258469
+                    (start := (find := text.find)('"') + 1):find('"', start)]
+                warning(
+                    f'`toomanyvalues` error occurred; trying to split '
+                    f'`{param}` into several API calls.\n'
+                    # e.g. on `templatesandboxprefix` of `parse` module.
+                    f"NOTE: sometimes doing this does not make sense.")
+                param_values = data[param].split('|')
+                limit = e['data']['limit']
+                for i in range(0, len(param_values), limit):
+                    data[param] = '|'.join(param_values[i:i + limit])
+                    yield from self.post_and_continue(data)
+                return
             yield json
             if (continue_ := json.get('continue')) is None:
                 return

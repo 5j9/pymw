@@ -39,6 +39,7 @@ Notable features
 - Some convenient methods for accessing common API calls, e.g. for login_, upload_.
 - Automatically tries to login if an API call returns ``login-required`` error (requires username and password to be set in ``~/.pymw.toml``).
 - Lightweight. ``pymw`` is a thin wrapper. Method signatures are very similar to the parameters in an actual API URL. You can consult MediaWiki's documentation if in doubt about what a parameter does.
+- The ``post_and_continue`` method can handle *most* ``toomanyvalues`` errors by automatically splitting the violating parameter into several API calls. (not a feature to rely on in production, but nice to have during a console session for example.)
 
 .. _MediaWiki: https://www.mediawiki.org/
 .. _User-Agent header: https://www.mediawiki.org/wiki/API:Etiquette#The_User-Agent_header

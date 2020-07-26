@@ -123,7 +123,7 @@ def test_recentchanges(_):
         'action': 'query', 'errorformat': 'plaintext', 'format': 'json',
         'formatversion': '2', 'maxlag': 5, 'meta': 'tokens', 'type': 'watch'
     }, files=None),
-    {'retry-after': '5'}, {'errors': [{'code': 'maxlag', 'text': 'Waiting for 10.64.16.7: 0.80593395233154 seconds lagged.', 'data': {'host': '10.64.16.7', 'lag': 0.805933952331543, 'type': 'db'}, 'module': 'main'}], 'docref': 'See https://www.mediawiki.org/w/api.php for API usage. Subscribe to the mediawiki-api-announce mailing list at &lt;https://lists.wikimedia.org/mailman/listinfo/mediawiki-api-announce&gt; for notice of API deprecations and breaking changes.', 'servedby': 'mw1225'},
+    {'retry-after': '5'}, {'errors': [{'code': 'maxlag', 'text': 'Waiting for 10.64.16.7: 0.80593395233154 seconds lagged.', 'data': {'host': '10.64.16.7', 'lag': 0.805933952331543, 'type': 'db'}, 'module': 'main'}], 'docref': ..., 'servedby': 'mw1225'},
     call(data={
         'meta': 'tokens', 'type': 'watch', 'action': 'query', 'format': 'json',
         'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5
@@ -206,7 +206,7 @@ def test_context_manager():
     call(data={
         'revid': 27040231, 'action': 'patrol', 'token': '+\\', 'format':
             'json', 'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5
-    }, files=None), {}, {'errors': [{'code': 'permissiondenied', 'text': 'T', 'module': 'patrol'}], 'docref': 'D', 'servedby': 'mw1233'})
+    }, files=None), {}, {'errors': [{'code': 'permissiondenied', 'text': 'T', 'module': 'patrol'}], 'docref': ..., 'servedby': 'mw1233'})
 def test_patrol_not_logged_in(_, cleared_api):
     try:
         cleared_api.patrol(revid=27040231)
@@ -225,7 +225,7 @@ def test_patrol(post_mock):
     post_mock.assert_called_once()
 
 
-@session_post_patch(any, {}, {'errors': [{'code': 'badtoken', 'text': 'Invalid CSRF token.', 'module': 'patrol'}], 'docref': 'D', 'servedby': 'mw1279'})
+@session_post_patch(any, {}, {'errors': [{'code': 'badtoken', 'text': 'Invalid CSRF token.', 'module': 'patrol'}], 'docref': ..., 'servedby': 'mw1279'})
 def test_bad_patrol_token(_):
     api.tokens['patrol'] = 'T'
     try:
@@ -391,7 +391,7 @@ def test_assert_login(post_mock):
         'notfilter': '!read', 'meta': 'notifications', 'action': 'query',
         'errorformat': 'plaintext', 'format': 'json', 'formatversion': '2',
         'maxlag': 5}, files=None),
-    {'errors': [{'code': 'login-required', 'text': 'You must be logged in.', 'module': 'query+notifications'}], 'docref': '', 'servedby': 'mw1341'},
+    {'errors': [{'code': 'login-required', 'text': 'You must be logged in.', 'module': 'query+notifications'}], 'docref': ..., 'servedby': 'mw1341'},
     call(data={
         'type': 'login', 'meta': 'tokens', 'action': 'query', 'format': 'json',
         'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5}, files=None),
@@ -590,7 +590,7 @@ watch_response = {'batchcomplete': True, 'watch': [{'title': '0', 'ns': 0, 'unwa
     {'errors': [{
         'code': 'notloggedin',
         'text': 'Please log in to view or edit items on your watchlist.',
-        'module': 'watch'}], 'docref': '', 'servedby': 'mw1342'},
+        'module': 'watch'}], 'docref': ..., 'servedby': 'mw1342'},
     call(data={
         'type': 'login', 'meta': 'tokens', 'action': 'query', 'format': 'json',
         'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5
@@ -625,3 +625,40 @@ def test_notloggedin_error(_post_mock, cleared_api):
 
 def test_token_repr():
     assert f"{Token('type', 'value')!r}" == "Token('type', 'value')"
+
+
+spamblacklist_ok = {'spamblacklist': {'result': 'ok'}}
+
+
+@session_post_patch(
+    any, {'errors': [{
+        'code': 'toomanyvalues',
+        'text': 'Too many values supplied for parameter "url". The limit is 50.',
+        'data': {'limit': 50, 'lowlimit': 50, 'highlimit': 500},
+        'module': 'spamblacklist'}], 'docref': ..., 'servedby': 'mw1356'},
+    call(data={
+        'action': 'spamblacklist',
+        'url': '0|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23'
+               '|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40|41|42|43|44'
+               '|45|46|47|48|49',
+        'format': 'json', 'formatversion': '2', 'errorformat': 'plaintext',
+        'maxlag': 5}, files=None), spamblacklist_ok,
+    call(data={
+        'action': 'spamblacklist', 'url': '50', 'format': 'json',
+        'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5},
+        files=None),
+    spamblacklist_ok)
+@patch('pymw._api.warning')
+def test_handle_toomanyvalues_in_post_and_continue(warning, _, cleared_api):
+    for r in cleared_api.post_and_continue({
+            'action': 'spamblacklist',
+            'url': '0|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22'
+                   '|23|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40|41'
+                   '|42|43|44|45|46|47|48|49|50',
+            'format': 'json', 'formatversion': '2', 'errorformat': 'plaintext',
+            'maxlag': 5}):
+        assert r is spamblacklist_ok
+    warning.assert_called_once_with(
+        '`toomanyvalues` error occurred; '
+        'trying to split `url` into several API calls.\n'
+        'NOTE: sometimes doing this does not make sense.')
