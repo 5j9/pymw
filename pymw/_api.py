@@ -158,7 +158,6 @@ class API:
     def _handle_toomanyvalues_error(
         self, resp: Response, data: dict, error: dict
     ):
-        # handling could be simplified if T258469 gets implemented.
         raise TooManyValuesError(error)
 
     def clear_cache(self) -> None:
