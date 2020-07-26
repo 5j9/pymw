@@ -26,7 +26,7 @@ class APIError(PYMWError):
     pass
 
 
-class LoginError(PYMWError):
+class LoginError(APIError):
     __slots__ = ()
     pass
 
