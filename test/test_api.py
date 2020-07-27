@@ -201,30 +201,6 @@ def test_context_manager():
     close_mock.assert_called_once_with()
 
 
-@session_post_patch(
-    any, {}, {'batchcomplete': True, 'query': {'tokens': {'patroltoken': '+\\'}}},
-    call(data={
-        'revid': 27040231, 'action': 'patrol', 'token': '+\\', 'format':
-            'json', 'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5
-    }, files=None), {}, {'errors': [{'code': 'permissiondenied', 'text': 'T', 'module': 'patrol'}], 'docref': ..., 'servedby': 'mw1233'})
-def test_patrol_not_logged_in(_, cleared_api):
-    try:
-        cleared_api.patrol(revid=27040231)
-    except APIError:
-        pass
-    else:  # pragma: nocover
-        raise AssertionError('APIError was not raised')
-
-
-@api_post_patch(
-    call({'action': 'patrol', 'token': 'T', 'revid': 1}),
-    {'patrol': {'rcid': 1, 'ns': 4, 'title': 'T'}})
-def test_patrol(post_mock):
-    api.tokens['patrol'] = 'T'
-    api.patrol(revid=1)
-    post_mock.assert_called_once()
-
-
 @session_post_patch(any, {}, {'errors': [{'code': 'badtoken', 'text': 'Invalid CSRF token.', 'module': 'patrol'}], 'docref': ..., 'servedby': 'mw1279'})
 def test_bad_patrol_token(_):
     api.tokens['patrol'] = 'T'
@@ -302,11 +278,10 @@ def test_revisions_mode2_no_rvlimit(post_mock):  # auto set rvlimit
 
 
 @api_post_patch(
-    call({'action': 'upload', 'token': 'T', 'filename': 'FN.jpg'}, files={'file': ('FN.jpg', NotImplemented)}),
+    call({'action': 'upload', 'filename': 'FN.jpg'}, files={'file': ('FN.jpg', NotImplemented)}),
     {'upload': {'result': 'Warning', 'warnings': {'exists': 'Test.jpg', 'nochange': {'timestamp': '2020-07-04T07:29:07Z'}}, 'filekey': 'tampered.y27er1.18.jpg', 'sessionkey': 'tampered.y27er1.18.jpg'}})
 def test_upload_file(post_mock):
     api._assert_user = 'James Bond'
-    api.tokens['csrf'] = 'T'
     api.upload_file(file=NotImplemented, filename='FN.jpg')
     post_mock.assert_called_once()
 
@@ -326,21 +301,19 @@ bio1 = BytesIO(b'1')
 
 @api_post_patch(
     call(
-        {'action': 'upload', 'token': 'T', 'stash': 1, 'offset': 0, 'filename': 'F.jpg', 'filesize': 5039, 'ignorewarnings': True},
+        {'action': 'upload', 'stash': 1, 'offset': 0, 'filename': 'F.jpg', 'filesize': 5039, 'ignorewarnings': True},
         files={'chunk': ('F.jpg', bio0)}),
     {'upload': {'warnings': {'duplicate-archive': 'F.jpg'}, 'result': 'Continue', 'offset': 3000, 'filekey': 'K'}},
     call(
-        {'action': 'upload', 'token': 'T', 'stash': 1, 'offset': 3000, 'filename': 'F.jpg', 'filesize': 5039, 'ignorewarnings': True, 'filekey': 'K'},
+        {'action': 'upload', 'stash': 1, 'offset': 3000, 'filename': 'F.jpg', 'filesize': 5039, 'ignorewarnings': True, 'filekey': 'K'},
         files={'chunk': ('F.jpg', bio1)}),
     {'upload': {'filekey': 'K.jpg', 'imageinfo': {'CENSORED': ...}, 'result': 'Success', 'warnings': {'duplicate-archive': 'T.jpg'}}},
     call(
-        {'action': 'upload', 'token': 'T', 'filename': 'F.jpg', 'ignorewarnings': True, 'filekey': 'K.jpg'},
+        {'action': 'upload', 'filename': 'F.jpg', 'ignorewarnings': True, 'filekey': 'K.jpg'},
         files=None),
     {'upload': {'filename': 'F.jpg', 'imageinfo': {'CENSORED': ...}, 'result': 'Success'}})
 def test_upload_chunks(_):
     api._assert_user = 'U'
-    api.tokens['csrf'] = 'T'
-
     result = api.upload_chunks(
         chunks=(b for b in (bio0, bio1)),
         filename='F.jpg',

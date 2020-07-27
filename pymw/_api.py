@@ -1,7 +1,8 @@
+from collections import defaultdict
 from fnmatch import fnmatch
 from functools import partial
 from pprint import pformat
-from typing import Any, BinaryIO, Generator, Iterator, Optional, \
+from typing import Any, BinaryIO, Generator, Iterator, Literal, Optional, \
     Union
 from logging import warning, debug, info
 from pathlib import Path
@@ -14,6 +15,81 @@ __version__ = '0.6.2.dev0'
 
 
 TOML_DICT: Optional[dict] = None
+
+
+LOGIN_ACTIONS = {
+    'patrol',
+}
+
+# a dictionary from action name to token parameter name and token type
+# noinspection PyTypeChecker
+TOKEN_INFO: defaultdict[str, Optional[tuple[str, Literal[
+    'createaccount', 'csrf', 'deleteglobalaccount', 'login', 'patrol',
+    'rollback', 'setglobalaccountstatus', 'userrights', 'watch'
+]]]] = defaultdict(lambda: (None, None), {
+    'abusefilterunblockautopromote': ('token', 'csrf'),
+    'abuselogprivatedetails': ('token', 'csrf'),
+    'block': ('token', 'csrf'),
+    'centralnoticecdncacheupdatebanner': ('token', 'csrf'),
+    'changeauthenticationdata': ('changeauthtoken', 'csrf'),
+    'changecontentmodel': ('changeauthtoken', 'csrf'),
+    'clientlogin': ('logintoken', 'login'),
+    'createaccount': ('createtoken', 'createaccount'),
+    'cxdelete': ('token', 'csrf'),
+    'cxsuggestionlist': ('token', 'csrf'),
+    'cxtoken': ('token', 'csrf'),
+    'delete': ('token', 'csrf'),
+    'deleteglobalaccount': ('token', 'deleteglobalaccount'),
+    'echomarkread': ('token', 'csrf'),
+    'echomute': ('token', 'csrf'),
+    'edit': ('token', 'csrf'),
+    'editmassmessagelist': ('token', 'csrf'),
+    'emailuser': ('token', 'csrf'),
+    'filerevert': ('token', 'csrf'),
+    'globalblock': ('token', 'csrf'),
+    'globalpreferenceoverrides': ('token', 'csrf'),
+    'globalpreferences': ('token', 'csrf'),
+    'globaluserrights': ('token', 'userrights'),
+    'import': ('token', 'userrights'),
+    'linkaccount': ('linktoken', 'csrf'),
+    'login': ('lgtoken', 'login'),
+    'logout': ('token', 'csrf'),
+    'managetags': ('token', 'csrf'),
+    'move': ('token', 'csrf'),
+    'pagetriageaction': ('token', 'csrf'),
+    'pagetriagetagcopyvio': ('token', 'csrf'),
+    'pagetriagetagging': ('token', 'csrf'),
+    'patrol': ('token', 'patrol'),
+    'protect': ('token', 'csrf'),
+    'removeauthenticationdata': ('token', 'csrf'),
+    'resetpassword': ('token', 'csrf'),
+    'review': ('token', 'csrf'),
+    'reviewactivity': ('token', 'csrf'),
+    'revisiondelete': ('token', 'csrf'),
+    'rollback': ('token', 'rollback'),
+    'setglobalaccountstatus': ('token', 'setglobalaccountstatus'),
+    'setnotificationtimestamp': ('token', 'csrf'),
+    'setpagelanguage': ('token', 'csrf'),
+    'stabilize': ('token', 'csrf'),
+    'strikevote': ('token', 'csrf'),
+    'tag': ('token', 'csrf'),
+    'thank': ('token', 'csrf'),
+    'transcodereset': ('token', 'csrf'),
+    'unblock': ('token', 'csrf'),
+    'undelete': ('token', 'csrf'),
+    'unlinkaccount': ('token', 'csrf'),
+    'upload': ('token', 'csrf'),
+    'userrights': ('token', 'userrights'),
+    'watch': ('token', 'watch'),
+    'wikilove': ('token', 'csrf'),
+    'cxpublish': ('token', 'csrf'),
+    'cxsave': ('token', 'csrf'),
+    'oathvalidate': ('token', 'csrf'),
+    'readinglists': ('token', 'csrf'),
+    'stashedit': ('token', 'csrf'),
+    'ulssetlang': ('token', 'csrf'),
+    'visualeditoredit': ('token', 'csrf'),
+})
 
 
 class PYMWError(RuntimeError):
@@ -127,9 +203,9 @@ class API:
     def _handle_badtoken_error(
         self, _: Response, __: dict, error: dict
     ) -> None:
-        if error['module'] == 'patrol':
-            info('invalidating patrol token cache')
-            del self.tokens['patrol']
+        param, token_type = TOKEN_INFO[error['module']]
+        info(f'invalidating {token_type} token cache')
+        del self.tokens[token_type]
 
     def _handle_login_required_error(
         self, _: Response, data: dict, __: dict
@@ -210,7 +286,7 @@ class API:
 
         https://www.mediawiki.org/wiki/API:Logout
         """
-        self.post({'action': 'logout', 'token': self.tokens['csrf']})
+        self.post({'action': 'logout'})
         self.clear_cache()
         # action logout returns empty dict on success, thus no return value
 
@@ -221,8 +297,13 @@ class API:
 
         https://www.mediawiki.org/wiki/API:Patrol
         """
-        params |= {'action': 'patrol', 'token': self.tokens['patrol']}
+        params |= {'action': 'patrol'}
         return self.post(params)
+
+    def _add_token(self, data: dict):
+        param, token_type = TOKEN_INFO[data.get('token')]
+        if param is not None:
+            data.setdefault(param, self.tokens[token_type])
 
     def post(self, data: dict, *, files=None) -> dict:
         """Post a request to MW API and return the json response.
@@ -236,6 +317,7 @@ class API:
             'formatversion': '2',
             'errorformat': 'plaintext',
             'maxlag': self.maxlag}
+        self._add_token(data)
         if self._assert_user is not None:
             data['assertuser'] = self._assert_user
         debug('data:\n\t%s\nfiles:\n\t%s', data, files)
@@ -378,7 +460,7 @@ class API:
         """
         if self._assert_user is None:
             self.login()
-        data |= {'action': 'upload', 'token': self.tokens['csrf']}
+        data['action'] = 'upload'
         return self.post(data, files=files)['upload']
 
     def upload_chunks(
