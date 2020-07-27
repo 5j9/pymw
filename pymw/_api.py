@@ -236,11 +236,6 @@ class API:
     ):
         raise TooManyValuesError(error)
 
-    def clear_cache(self) -> None:
-        """Clear cached values."""
-        self.tokens.clear()
-        self._assert_user = None
-
     def close(self) -> None:
         """Close the current API session and detach TokenManger."""
         del self.tokens.api  # cyclic reference
@@ -270,7 +265,7 @@ class API:
         login = json['login']
         result = login['result']
         if result == 'Success':
-            self.clear_cache()
+            self.tokens.clear()
             # lgusername == lgname.partition('@')[0]
             self._assert_user = login['lgusername']
             return login
@@ -287,7 +282,8 @@ class API:
         https://www.mediawiki.org/wiki/API:Logout
         """
         self.post({'action': 'logout'})
-        self.clear_cache()
+        self.tokens.clear()
+        self._assert_user = None
         # action logout returns empty dict on success, thus no return value
 
     def patrol(self, **params: Any) -> dict:

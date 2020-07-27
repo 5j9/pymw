@@ -15,7 +15,8 @@ api = API(url)
 
 @fixture
 def cleared_api():
-    api.clear_cache()
+    api.tokens.clear()
+    api._assert_user = None
     return api
 
 
