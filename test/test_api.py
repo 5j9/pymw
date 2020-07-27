@@ -6,7 +6,7 @@ from pytest import fixture, raises
 
 from pymw import API, LoginError, APIError
 # noinspection PyProtectedMember
-from pymw._api import Token, load_lgname_lgpass
+from pymw._api import load_lgname_lgpass
 
 
 url = 'https://www.mediawiki.org/w/api.php'
@@ -560,7 +560,7 @@ watch_response = {'batchcomplete': True, 'watch': [{'title': '0', 'ns': 0, 'unwa
     call(data={
         'action': 'watch', 'titles': '0|1', 'format': 'json',
         'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5,
-        'token': Token('watch', '+\\'), 'unwatch': True}, files=None),
+        'token': '+\\', 'unwatch': True}, files=None),
     {'errors': [{
         'code': 'notloggedin',
         'text': 'Please log in to view or edit items on your watchlist.',
@@ -572,7 +572,7 @@ watch_response = {'batchcomplete': True, 'watch': [{'title': '0', 'ns': 0, 'unwa
         'logintoken': 'LGT+\\'}}},
     call(data={
         'action': 'login', 'lgname': 'username@toolname',
-        'lgpassword': 'bot_password', 'lgtoken': Token('login', 'LGT+\\'),
+        'lgpassword': 'bot_password', 'lgtoken': 'LGT+\\',
         'format': 'json', 'formatversion': '2', 'errorformat': 'plaintext',
         'maxlag': 5}, files=None),
     {'login': {'result': 'Success', 'lguserid': 1, 'lgusername': 'username'}},
@@ -584,21 +584,17 @@ watch_response = {'batchcomplete': True, 'watch': [{'title': '0', 'ns': 0, 'unwa
     call(data={
         'action': 'watch', 'titles': '0|1', 'format': 'json',
         'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5,
-        'token': Token('watch', 'LIWT+\\'),
+        'token': 'LIWT+\\',
         'unwatch': True, 'assertuser': 'username'}, files=None),
     watch_response,)
 @patch('pymw._api.Path.open', pymw_toml_mock)
 def test_notloggedin_error(_post_mock, cleared_api):
-    watch_token = Token('watch', '+\\')
+    cleared_api.tokens['watch'] = '+\\'
     r = cleared_api.post({
         'action': 'watch', 'titles': '0|1', 'format': 'json',
         'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5,
-        'token': watch_token, 'unwatch': True})
+        'unwatch': True})
     assert r is watch_response
-
-
-def test_token_repr():
-    assert f"{Token('type', 'value')!r}" == "Token('type', 'value')"
 
 
 spamblacklist_ok = {'spamblacklist': {'result': 'ok'}}

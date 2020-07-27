@@ -23,7 +23,7 @@ LOGIN_ACTIONS = {
 
 # a dictionary from action name to token parameter name and token type
 # noinspection PyTypeChecker
-TOKEN_INFO: defaultdict[str, Optional[tuple[str, Literal[
+ACTION_PARAM_TOKEN: defaultdict[str, Optional[tuple[str, Literal[
     'createaccount', 'csrf', 'deleteglobalaccount', 'login', 'patrol',
     'rollback', 'setglobalaccountstatus', 'userrights', 'watch'
 ]]]] = defaultdict(lambda: (None, None), {
@@ -118,31 +118,15 @@ class TooManyValuesError(APIError):
         return self.error[item]
 
 
-class Token(str):
-
-    __slots__ = 'token_type', 'value'
-
-    def __new__(cls, token_type, value):
-        return super().__new__(cls, value)
-
-    def __init__(self, token_type, value):
-        super().__init__()
-        self.value = value
-        self.token_type = token_type
-
-    def __repr__(self):
-        return f'{type(self).__name__}({self.token_type!r}, {self.value!r})'
-
-
 class TokenManager(dict):
 
     def __init__(self, api: 'API'):
         self.api = api
         super().__init__()
 
-    def __missing__(self, token_type) -> Token:
-        v = self[token_type] = Token(token_type, self.api.query_meta(
-            'tokens', type=token_type)[f'{token_type}token'])
+    def __missing__(self, token_type) -> str:
+        v = self[token_type] = self.api.query_meta(
+            'tokens', type=token_type)[f'{token_type}token']
         return v
 
 
@@ -203,7 +187,7 @@ class API:
     def _handle_badtoken_error(
         self, _: Response, __: dict, error: dict
     ) -> None:
-        param, token_type = TOKEN_INFO[error['module']]
+        param, token_type = ACTION_PARAM_TOKEN[error['module']]
         info(f'invalidating {token_type} token cache')
         del self.tokens[token_type]
 
@@ -227,8 +211,7 @@ class API:
     ):
         warning('"notloggedin" error occurred; trying to login...')
         self.login()
-        if (token := data.get('token')) is not None:
-            data['token'] = self.tokens[token.token_type]
+        data.pop(ACTION_PARAM_TOKEN[data.get('action')][0], None)
         return self.post(data)
 
     def _handle_toomanyvalues_error(
@@ -296,8 +279,8 @@ class API:
         params |= {'action': 'patrol'}
         return self.post(params)
 
-    def _add_token(self, data: dict):
-        param, token_type = TOKEN_INFO[data.get('token')]
+    def _add_token(self, /, data: dict):
+        param, token_type = ACTION_PARAM_TOKEN[data.get('action')]
         if param is not None:
             data.setdefault(param, self.tokens[token_type])
 
