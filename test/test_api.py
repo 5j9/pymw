@@ -41,9 +41,13 @@ def patch_post(obj, attr, call_returns, ):
     def side_effect(*args, **kwargs):
         nonlocal i
         i += 2
-        if (call := call_returns[i]) is not any:
-            assert args == call.args
-            assert kwargs == call.kwargs
+        if (expected := call_returns[i]) is not any:
+            assert args == expected.args
+            call_pop = (expected_kwargs := expected.kwargs).pop
+            actual_pop = kwargs.pop
+            assert call_pop('files', None) == actual_pop('files', None)
+            assert call_pop('params', None) == actual_pop('params', None)
+            assert not kwargs and not expected_kwargs
         return call_returns[i + 1]
 
     return patch.object(obj, attr, side_effect=side_effect)
@@ -120,15 +124,15 @@ def test_recentchanges(_):
 @patch('pymw._api.sleep', fake_sleep)
 @patch('pymw._api.warning')
 @session_post_patch(
-    call(data={
+    call({
         'action': 'query', 'errorformat': 'plaintext', 'format': 'json',
         'formatversion': '2', 'maxlag': 5, 'meta': 'tokens', 'type': 'watch'
-    }, files=None),
+    }),
     {'retry-after': '5'}, {'errors': [{'code': 'maxlag', 'text': 'Waiting for 10.64.16.7: 0.80593395233154 seconds lagged.', 'data': {'host': '10.64.16.7', 'lag': 0.805933952331543, 'type': 'db'}, 'module': 'main'}], 'docref': ..., 'servedby': 'mw1225'},
-    call(data={
+    call({
         'meta': 'tokens', 'type': 'watch', 'action': 'query', 'format': 'json',
         'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5
-    }, files=None),
+    }),
     {}, {'batchcomplete': True, 'query': {'tokens': {'watchtoken': '+\\'}}})
 def test_maxlag(_, warning_mock, cleared_api):
     tokens = cleared_api.query_meta('tokens', type='watch')
@@ -311,8 +315,7 @@ bio1 = BytesIO(b'1')
         files={'chunk': ('F.jpg', bio1)}),
     {'upload': {'filekey': 'K.jpg', 'imageinfo': {'CENSORED': ...}, 'result': 'Success', 'warnings': {'duplicate-archive': 'T.jpg'}}},
     call(
-        {'action': 'upload', 'filename': 'F.jpg', 'ignorewarnings': True, 'filekey': 'K.jpg'},
-        files=None),
+        {'action': 'upload', 'filename': 'F.jpg', 'ignorewarnings': True, 'filekey': 'K.jpg'}),
     {'upload': {'filename': 'F.jpg', 'imageinfo': {'CENSORED': ...}, 'result': 'Success'}})
 def test_upload_chunks(_):
     api._user = 'U'
@@ -357,29 +360,29 @@ def test_login_config(post_mock, cleared_api):
 def test_assert_login(post_mock):
     api._user = 'USER'
     api.post({})
-    assert post_mock.mock_calls[0].kwargs['data']['assertuser'] == 'USER'
+    assert post_mock.mock_calls[0].args[0]['assertuser'] == 'USER'
 
 
 @patch('pymw._api.Path.open', pymw_toml_mock)
 @session_post_patch(
-    call(data={
+    call({
         'notfilter': '!read', 'meta': 'notifications', 'action': 'query',
         'errorformat': 'plaintext', 'format': 'json', 'formatversion': '2',
-        'maxlag': 5}, files=None),
+        'maxlag': 5}),
     {'errors': [{'code': 'login-required', 'text': 'You must be logged in.', 'module': 'query+notifications'}], 'docref': ..., 'servedby': 'mw1341'},
-    call(data={
+    call({
         'type': 'login', 'meta': 'tokens', 'action': 'query', 'format': 'json',
-        'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5}, files=None),
+        'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5}),
     {'batchcomplete': True, 'query': {'tokens': {'logintoken': 'T1'}}},
-    call(data={
+    call({
         'action': 'login', 'lgname': 'username@toolname', 'lgpassword':
             'bot_password', 'lgtoken': 'T1', 'format': 'json', 'formatversion':
-            '2', 'errorformat': 'plaintext', 'maxlag': 5}, files=None),
+            '2', 'errorformat': 'plaintext', 'maxlag': 5}),
     {'login': {'result': 'Success', 'lguserid': 1, 'lgusername': 'username'}},
-    call(data={
+    call({
         'notfilter': '!read', 'meta': 'notifications', 'action': 'query',
         'format': 'json', 'formatversion': '2', 'errorformat': 'plaintext',
-        'maxlag': 5, 'assertuser': 'username'}, files=None),
+        'maxlag': 5, 'assertuser': 'username'}),
     {'batchcomplete': True, 'query': {'notifications': {'list': [], 'continue': None}}},
 )
 def test_handle_login_required(_, cleared_api):
@@ -560,35 +563,35 @@ watch_response = {'batchcomplete': True, 'watch': [{'title': '0', 'ns': 0, 'unwa
 
 
 @session_post_patch(
-    call(data={
+    call({
         'action': 'watch', 'titles': '0|1', 'format': 'json',
         'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5,
-        'token': '+\\', 'unwatch': True}, files=None),
+        'token': '+\\', 'unwatch': True}),
     {'errors': [{
         'code': 'notloggedin',
         'text': 'Please log in to view or edit items on your watchlist.',
         'module': 'watch'}], 'docref': ..., 'servedby': 'mw1342'},
-    call(data={
+    call({
         'type': 'login', 'meta': 'tokens', 'action': 'query', 'format': 'json',
         'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5
-    }, files=None), {'batchcomplete': True, 'query': {'tokens': {
+    }), {'batchcomplete': True, 'query': {'tokens': {
         'logintoken': 'LGT+\\'}}},
-    call(data={
+    call({
         'action': 'login', 'lgname': 'username@toolname',
         'lgpassword': 'bot_password', 'lgtoken': 'LGT+\\',
         'format': 'json', 'formatversion': '2', 'errorformat': 'plaintext',
-        'maxlag': 5}, files=None),
+        'maxlag': 5}),
     {'login': {'result': 'Success', 'lguserid': 1, 'lgusername': 'username'}},
-    call(data={
+    call({
         'type': 'watch', 'meta': 'tokens', 'action': 'query', 'format': 'json',
         'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5,
-        'assertuser': 'username'}, files=None),
+        'assertuser': 'username'}),
     {'batchcomplete': True, 'query': {'tokens': {'watchtoken': 'LIWT+\\'}}},
-    call(data={
+    call({
         'action': 'watch', 'titles': '0|1', 'format': 'json',
         'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5,
         'token': 'LIWT+\\',
-        'unwatch': True, 'assertuser': 'username'}, files=None),
+        'unwatch': True, 'assertuser': 'username'}),
     watch_response,)
 @patch('pymw._api.Path.open', pymw_toml_mock)
 # assume that watch is not marked as a login-required action
@@ -611,17 +614,16 @@ spamblacklist_ok = {'spamblacklist': {'result': 'ok'}}
         'text': 'Too many values supplied for parameter "url". The limit is 50.',
         'data': {'limit': 50, 'lowlimit': 50, 'highlimit': 500},
         'module': 'spamblacklist'}], 'docref': ..., 'servedby': 'mw1356'},
-    call(data={
+    call({
         'action': 'spamblacklist',
         'url': '0|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23'
                '|24|25|26|27|28|29|30|31|32|33|34|35|36|37|38|39|40|41|42|43|44'
                '|45|46|47|48|49',
         'format': 'json', 'formatversion': '2', 'errorformat': 'plaintext',
-        'maxlag': 5}, files=None), spamblacklist_ok,
-    call(data={
+        'maxlag': 5}), spamblacklist_ok,
+    call({
         'action': 'spamblacklist', 'url': '50', 'format': 'json',
-        'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5},
-        files=None),
+        'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5}),
     spamblacklist_ok)
 @patch('pymw._api.warning')
 def test_handle_toomanyvalues_in_post_and_continue(warning, _, cleared_api):
@@ -639,10 +641,10 @@ def test_handle_toomanyvalues_in_post_and_continue(warning, _, cleared_api):
         'NOTE: sometimes doing this does not make sense.')
 
 
-@session_post_patch(call(data={
+@session_post_patch(call({
     'action': 'paraminfo', 'modules': 'query+info|query+categorymembers',
     'format': 'json', 'formatversion': '2', 'errorformat': 'plaintext',
-    'maxlag': 5}, files=None), {})
+    'maxlag': 5}), {})
 def test_iterable_values_to_str(_):
     api.post({
         'action': 'paraminfo',
