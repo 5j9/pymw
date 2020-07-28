@@ -1,4 +1,3 @@
-from collections import defaultdict
 from fnmatch import fnmatch
 from functools import partial
 from pprint import pformat
@@ -45,12 +44,21 @@ LOGIN_REQUIRED_ACTIONS = {
     'watch',
 }
 
+
+class MissingDict(dict):
+    __slots__ = '__missing__'
+
+    def __init__(self, missing: callable, items: tuple[str, Any]):
+        super().__init__(items)
+        self.__missing__ = missing
+
+
 # a dictionary from action name to token parameter name and token type
 # noinspection PyTypeChecker
-ACTION_PARAM_TOKEN: defaultdict[str, Optional[tuple[str, Literal[
+ACTION_PARAM_TOKEN: dict[str, tuple[Optional[str], Optional[Literal[
     'createaccount', 'csrf', 'deleteglobalaccount', 'login', 'patrol',
     'rollback', 'setglobalaccountstatus', 'userrights', 'watch'
-]]]] = defaultdict(lambda: (None, None), (
+]]]] = MissingDict(lambda _: (None, None), (
     ('abusefilterunblockautopromote', ('token', 'csrf')),
     ('abuselogprivatedetails', ('token', 'csrf')),
     ('block', ('token', 'csrf')),
