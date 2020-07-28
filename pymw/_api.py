@@ -18,7 +18,31 @@ TOML_DICT: Optional[dict] = None
 
 
 LOGIN_REQUIRED_ACTIONS = {
-    'patrol', 'upload', 'watch'
+    'block',
+    'delete',
+    'deleteglobalaccount',
+    'globalblock',
+    'globalpreferenceoverrides',
+    'globalpreferences',
+    'globaluserrights',
+    'linkaccount',
+    'options',
+    'patrol',
+    'protect',
+    'resetpassword',
+    'review',
+    'reviewactivity',
+    'revisiondelete',
+    'setglobalaccountstatus',
+    'setnotificationtimestamp',
+    'stabilize',
+    'strikevote',
+    'unblock',
+    'undelete',
+    'unlinkaccount',
+    'upload',
+    'userrights',
+    'watch',
 }
 
 # a dictionary from action name to token parameter name and token type
