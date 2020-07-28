@@ -16,7 +16,7 @@ api = API(url)
 @fixture
 def cleared_api():
     api.tokens.clear()
-    api._assert_user = None
+    api._user = None
     return api
 
 
@@ -204,7 +204,7 @@ def test_context_manager():
 
 @session_post_patch(any, {}, {'errors': [{'code': 'badtoken', 'text': 'Invalid CSRF token.', 'module': 'patrol'}], 'docref': ..., 'servedby': 'mw1279'})
 def test_bad_patrol_token(_):
-    api._assert_user = 'x'
+    api._user = 'x'
     api.tokens['patrol'] = 'T'
     try:
         api.patrol(revid=1)
@@ -283,7 +283,7 @@ def test_revisions_mode2_no_rvlimit(post_mock):  # auto set rvlimit
     call({'action': 'upload', 'filename': 'FN.jpg'}, files={'file': ('FN.jpg', NotImplemented)}),
     {'upload': {'result': 'Warning', 'warnings': {'exists': 'Test.jpg', 'nochange': {'timestamp': '2020-07-04T07:29:07Z'}}, 'filekey': 'tampered.y27er1.18.jpg', 'sessionkey': 'tampered.y27er1.18.jpg'}})
 def test_upload_file(post_mock):
-    api._assert_user = 'James Bond'
+    api._user = 'James Bond'
     api.upload_file(file=NotImplemented, filename='FN.jpg')
     post_mock.assert_called_once()
 
@@ -291,7 +291,7 @@ def test_upload_file(post_mock):
 @patch.object(API, 'login')
 def test_upload_file_auto_login(login_mock):
     login_mock.side_effect = NotImplementedError
-    api._assert_user = None
+    api._user = None
     with raises(NotImplementedError):
         api.upload_file(file=NotImplemented, filename='FN.jpg')
     login_mock.assert_called_once_with()
@@ -315,7 +315,7 @@ bio1 = BytesIO(b'1')
         files=None),
     {'upload': {'filename': 'F.jpg', 'imageinfo': {'CENSORED': ...}, 'result': 'Success'}})
 def test_upload_chunks(_):
-    api._assert_user = 'U'
+    api._user = 'U'
     result = api.upload_chunks(
         chunks=(b for b in (bio0, bio1)),
         filename='F.jpg',
@@ -355,7 +355,7 @@ def test_login_config(post_mock, cleared_api):
 
 @session_post_patch(any, {}, {})
 def test_assert_login(post_mock):
-    api._assert_user = 'USER'
+    api._user = 'USER'
     api.post({})
     assert post_mock.mock_calls[0].kwargs['data']['assertuser'] == 'USER'
 

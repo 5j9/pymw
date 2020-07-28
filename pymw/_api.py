@@ -132,7 +132,7 @@ class TokenManager(dict):
 
 # noinspection PyShadowingBuiltins
 class API:
-    __slots__ = '_url', 'session', 'maxlag', 'tokens', '_assert_user', '_post'
+    __slots__ = '_url', 'session', 'maxlag', 'tokens', '_user', '_post'
 
     def __enter__(self) -> 'API':
         return self
@@ -155,7 +155,7 @@ class API:
             https://www.mediawiki.org/wiki/API:Etiquette#The_User-Agent_header
             See also: https://meta.wikimedia.org/wiki/User-Agent_policy
         """
-        self._assert_user = None
+        self._user = None
         self.maxlag = maxlag
         s = self.session = Session()
         s.headers['User-Agent'] = \
@@ -250,7 +250,7 @@ class API:
         if result == 'Success':
             self.tokens.clear()
             # lgusername == lgname.partition('@')[0]
-            self._assert_user = login['lgusername']
+            self._user = login['lgusername']
             return login
         if result == 'WrongToken':
             # token is outdated?
@@ -266,7 +266,7 @@ class API:
         """
         self.post({'action': 'logout'})
         self.tokens.clear()
-        self._assert_user = None
+        self._user = None
         # action logout returns empty dict on success, thus no return value
 
     def patrol(self, **params: Any) -> dict:
@@ -284,7 +284,7 @@ class API:
             return
         # login
         if action in LOGIN_REQUIRED_ACTIONS:
-            if self._assert_user is None:
+            if self._user is None:
                 self.login()
         # token
         param, token_type = ACTION_PARAM_TOKEN[action]
@@ -304,8 +304,8 @@ class API:
             'errorformat': 'plaintext',
             'maxlag': self.maxlag}
         self._prepare_action(data)
-        if self._assert_user is not None:
-            data['assertuser'] = self._assert_user
+        if self._user is not None:
+            data['assertuser'] = self._user
         debug('data:\n\t%s\nfiles:\n\t%s', data, files)
         resp = self._post(data=data, files=files)
         json = resp.json()
@@ -498,6 +498,10 @@ class API:
     @property
     def url(self):
         return self._url
+
+    @property
+    def user(self):
+        return self._user
 
 
 def load_lgname_lgpass(api_url, username=None) -> tuple[str, str]:
