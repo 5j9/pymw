@@ -383,8 +383,10 @@ def test_assert_login(post_mock):
     {'batchcomplete': True, 'query': {'notifications': {'list': [], 'continue': None}}},
 )
 def test_handle_login_required(_, cleared_api):
+    assert cleared_api.user is None
     r = cleared_api.query_meta('notifications', notfilter='!read')
     assert r == {'list': [], 'continue': None}
+    assert cleared_api.user == 'username'
 
 
 @api_post_patch(
