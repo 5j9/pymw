@@ -187,7 +187,8 @@ class TokenManager(dict):
 
 # noinspection PyShadowingBuiltins
 class API:
-    __slots__ = '_url', 'session', 'maxlag', 'tokens', '_user', '_post'
+    __slots__ = '_url', 'session', 'maxlag', 'tokens', '_user', '_post', \
+        'last_response'
 
     def __enter__(self) -> 'API':
         return self
@@ -210,7 +211,7 @@ class API:
             https://www.mediawiki.org/wiki/API:Etiquette#The_User-Agent_header
             See also: https://meta.wikimedia.org/wiki/User-Agent_policy
         """
-        self._user = None
+        self.last_response = self._user = None
         self.maxlag = maxlag
         s = self.session = Session()
         s.headers['User-Agent'] = \
@@ -346,6 +347,17 @@ class API:
         if param is not None:
             data.setdefault(param, self.tokens[token_type])
 
+    @staticmethod
+    def _pipe_join_values(data):
+        # see also: requests.models.RequestEncodingMixin._encode_params
+        for k, v in data.items():
+            if isinstance(v, (str, bytes)):
+                continue
+            try:
+                data[k] = '|'.join(v)
+            except TypeError:
+                pass
+
     def post(self, data: dict, *, files=None) -> dict:
         """Post a request to MW API and return the json response.
 
@@ -359,10 +371,11 @@ class API:
             'errorformat': 'plaintext',
             'maxlag': self.maxlag}
         self._prepare_action(data)
+        self._pipe_join_values(data)
         if self._user is not None:
             data['assertuser'] = self._user
         debug('data:\n\t%s\nfiles:\n\t%s', data, files)
-        resp = self._post(data=data, files=files)
+        self.last_response = resp = self._post(data=data, files=files)
         json = resp.json()
         debug('resp.json:\n\t%s', json)
         if 'warnings' in json:
@@ -379,10 +392,11 @@ class API:
             f'`{param}` into several API calls.\n'
             # e.g. on `templatesandboxprefix` of `parse` module.
             f"NOTE: sometimes doing this does not make sense.")
+        # all iterable values are converted to str in _iterable_values_to_str
         param_values = data[param].split('|')
         limit = e['data']['limit']
         for i in range(0, len(param_values), limit):
-            data[param] = '|'.join(param_values[i:i + limit])
+            data[param] = param_values[i:i + limit]
             yield from self.post_and_continue(data)
 
     def post_and_continue(self, data: dict) -> Generator[dict, None, None]:

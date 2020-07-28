@@ -635,3 +635,13 @@ def test_handle_toomanyvalues_in_post_and_continue(warning, _, cleared_api):
         '`toomanyvalues` error occurred; '
         'trying to split `url` into several API calls.\n'
         'NOTE: sometimes doing this does not make sense.')
+
+
+@session_post_patch(call(data={
+    'action': 'paraminfo', 'modules': 'query+info|query+categorymembers',
+    'format': 'json', 'formatversion': '2', 'errorformat': 'plaintext',
+    'maxlag': 5}, files=None), {})
+def test_iterable_values_to_str(_):
+    api.post({
+        'action': 'paraminfo',
+        'modules': ('query+info', 'query+categorymembers')})
