@@ -17,8 +17,8 @@ __version__ = '0.6.2.dev0'
 TOML_DICT: Optional[dict] = None
 
 
-LOGIN_ACTIONS = {
-    'patrol',
+LOGIN_REQUIRED_ACTIONS = {
+    'patrol', 'upload'
 }
 
 # a dictionary from action name to token parameter name and token type
@@ -279,8 +279,15 @@ class API:
         params |= {'action': 'patrol'}
         return self.post(params)
 
-    def _add_token(self, /, data: dict):
-        param, token_type = ACTION_PARAM_TOKEN[data.get('action')]
+    def _prepare_action(self, /, data: dict):
+        if (action := data.get('action')) is None:
+            return
+        # login
+        if action in LOGIN_REQUIRED_ACTIONS:
+            if self._assert_user is None:
+                self.login()
+        # token
+        param, token_type = ACTION_PARAM_TOKEN[action]
         if param is not None:
             data.setdefault(param, self.tokens[token_type])
 
@@ -296,7 +303,7 @@ class API:
             'formatversion': '2',
             'errorformat': 'plaintext',
             'maxlag': self.maxlag}
-        self._add_token(data)
+        self._prepare_action(data)
         if self._assert_user is not None:
             data['assertuser'] = self._assert_user
         debug('data:\n\t%s\nfiles:\n\t%s', data, files)
@@ -437,8 +444,6 @@ class API:
 
         https://www.mediawiki.org/wiki/API:Upload
         """
-        if self._assert_user is None:
-            self.login()
         data['action'] = 'upload'
         return self.post(data, files=files)['upload']
 

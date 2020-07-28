@@ -204,6 +204,7 @@ def test_context_manager():
 
 @session_post_patch(any, {}, {'errors': [{'code': 'badtoken', 'text': 'Invalid CSRF token.', 'module': 'patrol'}], 'docref': ..., 'servedby': 'mw1279'})
 def test_bad_patrol_token(_):
+    api._assert_user = 'x'
     api.tokens['patrol'] = 'T'
     try:
         api.patrol(revid=1)
@@ -337,16 +338,16 @@ pymw_toml_mock = mock_open(read_data=pymw_toml)
 
 @patch('pymw._api.Path.open', pymw_toml_mock)
 @api_post_patch(any, {}, any, {})
-def test_login_config(post_mock):
+def test_login_config(post_mock, cleared_api):
     post_call_data = {
         'action': 'login', 'lgname': 'username@toolname',
         'lgpassword': 'bot_password', 'lgtoken': 'LOGIN_TOKEN'}
-    api.tokens['login'] = 'LOGIN_TOKEN'
+    cleared_api.tokens['login'] = 'LOGIN_TOKEN'
     with raises(KeyError):  # because of invalid api_post_patch response
-        api.login()  # without username
+        cleared_api.login()  # without username
     post_mock.assert_called_once_with(post_call_data)
     with raises(KeyError):  # again, because of invalid api_post_patch response
-        api.login('username@toolname')  # without username
+        cleared_api.login('username@toolname')  # with username
     # note that assert_called_with only checks the last call
     post_mock.assert_called_with(post_call_data)
     pymw_toml_mock.assert_called_once()
@@ -382,7 +383,7 @@ def test_assert_login(post_mock):
     {'batchcomplete': True, 'query': {'notifications': {'list': [], 'continue': None}}},
 )
 def test_handle_login_required(_, cleared_api):
-    r = api.query_meta('notifications', notfilter='!read')
+    r = cleared_api.query_meta('notifications', notfilter='!read')
     assert r == {'list': [], 'continue': None}
 
 
