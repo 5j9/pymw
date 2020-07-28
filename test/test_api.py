@@ -589,6 +589,8 @@ watch_response = {'batchcomplete': True, 'watch': [{'title': '0', 'ns': 0, 'unwa
         'unwatch': True, 'assertuser': 'username'}, files=None),
     watch_response,)
 @patch('pymw._api.Path.open', pymw_toml_mock)
+# assume that watch is not marked as a login-required action
+@patch.dict('pymw._api.LOGIN_REQUIRED_ACTIONS', clear=True)
 def test_notloggedin_error(_post_mock, cleared_api):
     cleared_api.tokens['watch'] = '+\\'
     r = cleared_api.post({

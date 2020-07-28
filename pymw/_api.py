@@ -18,7 +18,7 @@ TOML_DICT: Optional[dict] = None
 
 
 LOGIN_REQUIRED_ACTIONS = {
-    'patrol', 'upload'
+    'patrol', 'upload', 'watch'
 }
 
 # a dictionary from action name to token parameter name and token type
