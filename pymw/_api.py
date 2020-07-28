@@ -115,6 +115,37 @@ ACTION_PARAM_TOKEN: defaultdict[str, Optional[tuple[str, Literal[
     ('visualeditoredit', ('token', 'csrf')),
 ))
 
+LIMITED_PARAMS = {
+    'streamconfigs': {'streams', 'constraints'},
+    'clientlogin': {'loginrequests'},
+    'createaccount': {'createrequests'},
+    'cxsuggestionlist': {'titles'},
+    'echomarkread': {'wikis', 'list', 'unreadlist'},
+    'echomute': {'mute', 'unmute'},
+    'editmassmessagelist': {'add', 'remove'},
+    'globalpreferenceoverrides': {'change'},
+    'globalpreferences': {'change'},
+    'help': {'modules'},
+    'linkaccount': {'linkrequests'},
+    'options': {'change'},
+    'pagetriagetagging': {'taglist'},
+    'paraminfo': {'modules'},
+    'protect': {'protections', 'expiry'},
+    'purge': {'titles', 'pageids', 'revids'},
+    'query': {'titles', 'pageids', 'revids', 'list'},
+    'revisiondelete': {'ids'},
+    'setnotificationtimestamp': {'titles', 'pageids', 'revids'},
+    'spamblacklist': {'url'},
+    'tag': {'rcid', 'revid', 'logid', 'remove'},
+    'templatedata': {'titles', 'pageids', 'revids'},
+    'undelete': {'timestamps', 'fileids'},
+    'userrights': {'expiry'},
+    'watch': {'titles', 'pageids', 'revids'},
+    'cxpublish': {'publishtags'},
+    'visualeditor': {'preloadparams'},
+    'visualeditoredit': {'tags'},
+}
+
 
 class PYMWError(RuntimeError):
     __slots__ = ()
@@ -340,6 +371,20 @@ class API:
             return self._handle_api_errors(data, resp, json)
         return json
 
+    def _handle_too_many_values_error(self, e, data):
+        param = (text := e['text'])[  # T258469
+            (start := (find := text.find)('"') + 1):find('"', start)]
+        warning(
+            f'`toomanyvalues` error occurred; trying to split '
+            f'`{param}` into several API calls.\n'
+            # e.g. on `templatesandboxprefix` of `parse` module.
+            f"NOTE: sometimes doing this does not make sense.")
+        param_values = data[param].split('|')
+        limit = e['data']['limit']
+        for i in range(0, len(param_values), limit):
+            data[param] = '|'.join(param_values[i:i + limit])
+            yield from self.post_and_continue(data)
+
     def post_and_continue(self, data: dict) -> Generator[dict, None, None]:
         """Yield and continue post results until all the data is consumed."""
         if 'rawcontinue' in data:
@@ -350,18 +395,7 @@ class API:
             try:
                 json = self.post(data)
             except TooManyValuesError as e:
-                param = (text := e['text'])[  # T258469
-                    (start := (find := text.find)('"') + 1):find('"', start)]
-                warning(
-                    f'`toomanyvalues` error occurred; trying to split '
-                    f'`{param}` into several API calls.\n'
-                    # e.g. on `templatesandboxprefix` of `parse` module.
-                    f"NOTE: sometimes doing this does not make sense.")
-                param_values = data[param].split('|')
-                limit = e['data']['limit']
-                for i in range(0, len(param_values), limit):
-                    data[param] = '|'.join(param_values[i:i + limit])
-                    yield from self.post_and_continue(data)
+                yield from self._handle_too_many_values_error(e, data)
                 return  # pragma: nocover
             yield json
             if (continue_ := json.get('continue')) is None:
