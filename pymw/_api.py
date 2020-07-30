@@ -298,9 +298,9 @@ class API:
         `lgtoken` will be added automatically.
 
         :param lgname: User name. If not provided will be retrieved from
-            ~/.pymw.toml. See README.rst for more info.
+            ~/.pymw.json. See README.rst for more info.
         :param lgpassword: Password. If not provided will be retrieved from
-            ~/.pymw.toml. See README.rst for more info.
+            ~/.pymw.json. See README.rst for more info.
 
         https://www.mediawiki.org/wiki/API:Login
         """

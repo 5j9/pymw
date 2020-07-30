@@ -15,7 +15,7 @@ Installation
 
 Usage
 -----
-Create a ``.pymw.toml`` file in your home directory with the following content format to avoid directly providing username and password for login calls:
+To avoid directly providing username and password for login calls create a ``.pymw.json`` file in your home directory with the following format:
 
 .. code-block:: json
 
@@ -25,15 +25,18 @@ Create a ``.pymw.toml`` file in your home directory with the following content f
                 "BotPassword": "<BotPassword>"
             },
             "<AnotherUsername>": {
-                "BotPassword": "<BotPassword2>"
+                "BotPassword": "<BotPassword2>",
+                "limit": 500
             }
         },
         "https://*.wikipedia.org/w/api.php": {
-            "<Username>": "<BotPassword3>",
-            "limit": 500
+            "<Username>": {
+                "BotPassword": "<BotPassword3>"
+            }
         }
     }
 
+As you can see, glob patterns are supported.
 
 Notable features
 ----------------
@@ -42,7 +45,7 @@ Notable features
 - Handles batchcomplete_ signals for prop queries and yeilds the results as soon as a batch is complete.
 - Configurable maxlag_. Waits as the  API recommends and then retries.
 - Some convenient methods for accessing common API calls, e.g. for login_, upload_.
-- Automatically tries to login if an API call returns ``login-required`` error (requires username and password to be set in ``~/.pymw.toml``).
+- Automatically tries to login if an API call returns ``login-required`` error (requires username and password to be set in ``~/.pymw.json``).
 - Lightweight. ``pymw`` is a thin wrapper. Method signatures are very similar to the parameters in an actual API URL. You can consult MediaWiki's documentation if in doubt about what a parameter does.
 - The ``post_and_continue`` method can handle *most* ``toomanyvalues`` errors by automatically splitting the violating parameter into several API calls. (not a feature to rely on in production, but nice to have during a console session for example.)
 
