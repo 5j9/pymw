@@ -1,19 +1,20 @@
 from fnmatch import fnmatch
-from functools import partial
-from pprint import pformat
-from typing import Any, BinaryIO, Generator, Iterator, Literal, Optional, \
-    Union
+from functools import lru_cache, partial
+from itertools import islice
+from json import load as json_load
 from logging import warning, debug, info
 from pathlib import Path
+from pprint import pformat
 from time import sleep
+from typing import Any, BinaryIO, Generator, Iterator, Literal, Optional, \
+    Union
 
 from requests import Session, Response
-from tomlkit import parse as toml_parse
 
 __version__ = '0.6.2.dev0'
 
 
-TOML_DICT: Optional[dict] = None
+CONFIG: Optional[dict] = None
 
 
 LOGIN_REQUIRED_ACTIONS = {
@@ -140,7 +141,7 @@ LIMITED_PARAMS = {
     'paraminfo': {'modules'},
     'protect': {'protections', 'expiry'},
     'purge': {'titles', 'pageids', 'revids'},
-    'query': {'titles', 'pageids', 'revids', 'list'},
+    'query': {'titles', 'pageids', 'revids', 'list', 'siifilekey'},
     'revisiondelete': {'ids'},
     'setnotificationtimestamp': {'titles', 'pageids', 'revids'},
     'spamblacklist': {'url'},
@@ -152,7 +153,7 @@ LIMITED_PARAMS = {
     'cxpublish': {'publishtags'},
     'visualeditor': {'preloadparams'},
     'visualeditoredit': {'tags'},
-}
+}.get
 
 
 class PYMWError(RuntimeError):
@@ -196,7 +197,7 @@ class TokenManager(dict):
 # noinspection PyShadowingBuiltins
 class API:
     __slots__ = '_url', 'session', 'maxlag', 'tokens', '_user', '_post', \
-        'last_response'
+        'last_response', '_limit'
 
     def __enter__(self) -> 'API':
         return self
@@ -219,7 +220,7 @@ class API:
             https://www.mediawiki.org/wiki/API:Etiquette#The_User-Agent_header
             See also: https://meta.wikimedia.org/wiki/User-Agent_policy
         """
-        self.last_response = self._user = None
+        self._limit = self.last_response = self._user = None
         self.maxlag = maxlag
         s = self.session = Session()
         s.headers['User-Agent'] = \
@@ -304,7 +305,7 @@ class API:
         https://www.mediawiki.org/wiki/API:Login
         """
         if lgpassword is None:
-            lgname, lgpassword = load_lgname_lgpass(self._url, lgname)
+            lgname, lgpassword = get_lgname_lgpass(self._url, lgname)
         params |= {
             'action': 'login', 'lgname': lgname, 'lgpassword': lgpassword,
             'lgtoken': self.tokens['login']}
@@ -330,7 +331,7 @@ class API:
         """
         self.post({'action': 'logout'})
         self.tokens.clear()
-        self._user = None
+        self._user = self._limit = None
         # action logout returns empty dict on success, thus no return value
 
     def patrol(self, **params: Any) -> dict:
@@ -403,10 +404,31 @@ class API:
             f"NOTE: sometimes doing this does not make sense.")
         # all iterable values are converted to str in _iterable_values_to_str
         param_values = data[param].split('|')
-        limit = e['data']['limit']
+        self._limit = limit = e['data']['limit']
         for i in range(0, len(param_values), limit):
             data[param] = param_values[i:i + limit]
             yield from self.post_and_continue(data)
+
+    def _chunk_limited_param(self, data):
+        if (action_limited := LIMITED_PARAMS(data.get('action'))) is None:
+            yield data
+            return
+        if not (data_limited := action_limited & data.keys()) or \
+                len(data_limited) > 1:  # let the API raise error
+            yield data
+            return
+        # only one limited param was found in data, let's break it into
+        # multiple calls
+        if isinstance(values := data[(param := data_limited.pop())], str):
+            values = values.split('|')
+        if (limit := self._limit) is None:
+            self._limit = limit = get_limit(self._url, self._user)
+        values = iter(values)
+        while True:
+            if not (chunk := tuple(islice(values, limit))):
+                return
+            data[param] = chunk
+            yield data
 
     def post_and_continue(self, data: dict) -> Generator[dict, None, None]:
         """Yield and continue post results until all the data is consumed."""
@@ -414,22 +436,23 @@ class API:
             raise NotImplementedError(
                 'rawcontinue is not implemented for query method')
         prev_continue = None
-        while True:
-            try:
-                json = self.post(data)
-            except TooManyValuesError as e:
-                yield from self._handle_too_many_values_error(e, data)
-                return  # pragma: nocover
-            yield json
-            if (continue_ := json.get('continue')) is None:
-                return
-            if prev_continue is None:
+        for data in self._chunk_limited_param(data):
+            while True:
+                try:
+                    json = self.post(data)
+                except TooManyValuesError as e:
+                    yield from self._handle_too_many_values_error(e, data)
+                    return  # pragma: nocover
+                yield json
+                if (continue_ := json.get('continue')) is None:
+                    return
+                if prev_continue is None:
+                    data |= (prev_continue := continue_)
+                    continue
+                # Remove or update any prev_continue key in data.
+                for k in prev_continue.keys() - continue_.keys():
+                    del data[k]
                 data |= (prev_continue := continue_)
-                continue
-            # Remove or update any prev_continue key in data.
-            for k in prev_continue.keys() - continue_.keys():
-                del data[k]
-            data |= (prev_continue := continue_)
 
     def query(self, params: dict) -> Generator[dict, None, None]:
         """Post an API query and yield results.
@@ -585,19 +608,33 @@ class API:
         return self._user
 
 
-def load_lgname_lgpass(api_url, username=None) -> tuple[str, str]:
-    global TOML_DICT
-    if TOML_DICT is None:
-        with (Path('~').expanduser() / '.pymw.toml').open(
-            'r', encoding='utf8'
-        ) as f:
-            pymw_toml = f.read()
-        TOML_DICT = dict(toml_parse(pymw_toml))
-    if (url_config := TOML_DICT.get(api_url)) is None:
-        for url_pattern, url_config in TOML_DICT.items():
+def load_config() -> None:
+    global CONFIG
+    if CONFIG is None:
+        with (Path('~').expanduser() / '.pymw.json')\
+                .open(encoding='utf8') as f:
+            CONFIG = json_load(f)
+
+
+@lru_cache
+def get_config(api_url) -> Optional[dict]:
+    load_config()
+    if (url_config := CONFIG.get(api_url)) is None:
+        for url_pattern, url_config in CONFIG.items():
             if fnmatch(api_url, url_pattern):
                 break
-    login = url_config['login']
+    return url_config
+
+
+def get_lgname_lgpass(api_url, username=None) -> tuple[str, str]:
     if username is None:
-        return next(login.items())
-    return username, login[username]
+        username, user_config = next(iter(get_config(api_url).items()))
+        return username, user_config['BotPassword']
+    return username, get_config(api_url)[username]['BotPassword']
+
+
+def get_limit(api_url, username):
+    try:
+        get_config(api_url)[username]['limit']
+    except KeyError:
+        return 50

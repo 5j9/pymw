@@ -1,16 +1,31 @@
 from io import BytesIO
+from json import loads as json_loads
 from pprint import pformat
 from unittest.mock import call, patch, mock_open
 
 from pytest import fixture, raises
 
-from pymw import API, LoginError, APIError
+from pymw import API, LoginError, APIError, _api
 # noinspection PyProtectedMember
-from pymw._api import load_lgname_lgpass
-
+from pymw._api import get_lgname_lgpass, load_config
 
 url = 'https://www.mediawiki.org/w/api.php'
 api = API(url)
+
+
+TEXT_CONFIG = '''
+{
+    "https://www.mediawiki.org/w/api.php": {
+        "username@toolname": {"BotPassword": "bot_password"}
+    },
+    "https://*.wikipedia.org/w/api.php": {
+        "wp_user": {"BotPassword": "wp_pass"}
+    }
+}
+'''
+CONFIG = json_loads(TEXT_CONFIG)
+json_open_mock = mock_open(read_data=TEXT_CONFIG)
+patch.object(_api, 'CONFIG', CONFIG).start()
 
 
 @fixture
@@ -111,9 +126,9 @@ def test_unknown_login_result(post_mock):
 
 
 @api_post_patch(
-    call({'list': 'recentchanges', 'rcprop': 'timestamp', 'rclimit': 1, 'action': 'query'}),
+    call({'list': ('recentchanges',), 'rcprop': 'timestamp', 'rclimit': 1, 'action': 'query'}),
     {'batchcomplete': True, 'continue': {'rccontinue': '20190908072938|4484663', 'continue': '-||'}, 'query': {'recentchanges': [{'type': 'log', 'timestamp': '2019-09-08T07:30:00Z'}]}},
-    call({'list': 'recentchanges', 'rcprop': 'timestamp', 'rclimit': 1, 'action': 'query', 'rccontinue': '20190908072938|4484663', 'continue': '-||'}),
+    call({'list': ('recentchanges',), 'rcprop': 'timestamp', 'rclimit': 1, 'action': 'query', 'rccontinue': '20190908072938|4484663', 'continue': '-||'}),
     {'batchcomplete': True, 'query': {'recentchanges': [{'type': 'categorize', 'timestamp': '2019-09-08T07:29:38Z'}]}})
 def test_recentchanges(_):
     assert [rc for rc in api.query_list('recentchanges', rclimit=1, rcprop='timestamp')] == [
@@ -152,14 +167,14 @@ def test_siteinfo(post_mock):
 @api_post_patch(
     call({
         'action': 'query', 'prop': 'langlinks', 'lllimit': 1,
-        'titles': 'Main Page'}),
+        'titles': ('Main Page',)}),
     {'continue': {'llcontinue': '15580374|bg', 'continue': '||'}, 'query': {
         'pages': [{
             'pageid': 15580374, 'ns': 0, 'title': 'Main Page',
             'langlinks': [{'lang': 'ar', 'title': ''}]}]}},
     call({
         'action': 'query', 'prop': 'langlinks', 'lllimit': 1,
-        'titles': 'Main Page', 'llcontinue': '15580374|bg', 'continue': '||'}),
+        'titles': ('Main Page',), 'llcontinue': '15580374|bg', 'continue': '||'}),
     {'batchcomplete': True, 'query': {'pages': [{
         'pageid': 15580374, 'ns': 0, 'title': 'Main Page',
         'langlinks': [{'lang': 'zh', 'title': ''}]}]}})
@@ -171,7 +186,7 @@ def test_langlinks(_):
 
 
 @api_post_patch(
-    call({'action': 'query', 'prop': 'langlinks', 'titles': 'Main Page'}),
+    call({'action': 'query', 'prop': 'langlinks', 'titles': ('Main Page',)}),
     {'batchcomplete': True, 'query': {'pages': [{'pageid': 1182793, 'ns': 0, 'title': 'Main Page'}]}, 'limits': {'langlinks': 500}})
 def test_lang_links_title_not_exists(post_mock):
     titles_langlinks = [page_ll for page_ll in api.query_prop(
@@ -256,7 +271,7 @@ def test_csrf_token(post_mock):
 
 
 @api_post_patch(
-    call({'action': 'query', 'list': 'logevents', 'lelimit': 1, 'leprop': 'timestamp', 'ledir': 'newer', 'leend': '2004-12-23T18:41:10Z'}),
+    call({'action': 'query', 'list': ('logevents',), 'lelimit': 1, 'leprop': 'timestamp', 'ledir': 'newer', 'leend': '2004-12-23T18:41:10Z'}),
     {'batchcomplete': True, 'query': {'logevents': [{'timestamp': '2004-12-23T18:41:10Z'}]}})
 def test_logevents(post_mock):
     events = [e for e in api.query_list('logevents', lelimit=1, leprop='timestamp', ledir='newer', leend='2004-12-23T18:41:10Z')]
@@ -274,7 +289,7 @@ def test_revisions_mode13(_):
 
 
 @api_post_patch(
-    call({'action': 'query', 'prop': 'revisions', 'titles': 'DmazaTest', 'rvstart': 'now'}),
+    call({'action': 'query', 'prop': 'revisions', 'titles': ('DmazaTest',), 'rvstart': 'now'}),
     {'batchcomplete': True, 'query': {'pages': [{'pageid': 112963, 'ns': 0, 'title': 'DmazaTest', 'revisions': [{'revid': 438026, 'parentid': 438023, 'minor': False, 'user': 'DMaza (WMF)', 'timestamp': '2020-06-25T21:09:52Z', 'comment': ''}, {'revid': 438023, 'parentid': 438022, 'minor': False, 'user': 'DMaza (WMF)', 'timestamp': '2020-06-25T21:08:12Z', 'comment': ''}, {'revid': 438022, 'parentid': 0, 'minor': False, 'user': 'DMaza (WMF)', 'timestamp': '2020-06-25T21:08:02Z', 'comment': '1'}]}]}, 'limits': {'revisions': 500}})
 def test_revisions_mode2_no_rvlimit(post_mock):  # auto set rvlimit
     assert [
@@ -327,33 +342,12 @@ def test_upload_chunks(_):
     assert result == {'filename': 'F.jpg', 'imageinfo': {'CENSORED': ...}, 'result': 'Success'}
 
 
-pymw_toml = '''
-version = 1
-
-['https://www.mediawiki.org/w/api.php'.login]
-'username@toolname' = 'bot_password'
-
-['https://*.wikipedia.org/w/api.php'.login]
-'wp_user' = 'wp_pass'
-'''
-pymw_toml_mock = mock_open(read_data=pymw_toml)
-
-
-@patch('pymw._api.Path.open', pymw_toml_mock)
-@api_post_patch(any, {}, any, {})
-def test_login_config(post_mock, cleared_api):
-    post_call_data = {
-        'action': 'login', 'lgname': 'username@toolname',
-        'lgpassword': 'bot_password', 'lgtoken': 'LOGIN_TOKEN'}
-    cleared_api.tokens['login'] = 'LOGIN_TOKEN'
-    with raises(KeyError):  # because of invalid api_post_patch response
-        cleared_api.login()  # without username
-    post_mock.assert_called_once_with(post_call_data)
-    with raises(KeyError):  # again, because of invalid api_post_patch response
-        cleared_api.login('username@toolname')  # with username
-    # note that assert_called_with only checks the last call
-    post_mock.assert_called_with(post_call_data)
-    pymw_toml_mock.assert_called_once()
+@patch('pymw._api.Path.open', json_open_mock)
+@patch.object(_api, 'CONFIG', None)
+def test_login_config():
+    _api.load_config()
+    assert _api.CONFIG == CONFIG
+    json_open_mock.assert_called_once()
 
 
 @session_post_patch(any, {}, {})
@@ -363,7 +357,6 @@ def test_assert_login(post_mock):
     assert post_mock.mock_calls[0].args[0]['assertuser'] == 'USER'
 
 
-@patch('pymw._api.Path.open', pymw_toml_mock)
 @session_post_patch(
     call({
         'notfilter': '!read', 'meta': 'notifications', 'action': 'query',
@@ -553,10 +546,9 @@ def test_repr():
     assert repr(api) == f'API({repr(url)})'
 
 
-@patch('pymw._api.Path.open', pymw_toml_mock)
 def test_glob_pattern_load_lgname_lgpass():
-    assert load_lgname_lgpass('https://en.wikipedia.org/w/api.php') \
-        == ('wp_user', 'wp_pass')
+    assert get_lgname_lgpass('https://en.wikipedia.org/w/api.php') \
+           == ('wp_user', 'wp_pass')
 
 
 watch_response = {'batchcomplete': True, 'watch': [{'title': '0', 'ns': 0, 'unwatched': True}, {'title': '1', 'ns': 0, 'unwatched': True}]}
@@ -593,7 +585,6 @@ watch_response = {'batchcomplete': True, 'watch': [{'title': '0', 'ns': 0, 'unwa
         'token': 'LIWT+\\',
         'unwatch': True, 'assertuser': 'username'}),
     watch_response,)
-@patch('pymw._api.Path.open', pymw_toml_mock)
 # assume that watch is not marked as a login-required action
 @patch.dict('pymw._api.LOGIN_REQUIRED_ACTIONS', clear=True)
 def test_notloggedin_error(_post_mock, cleared_api):

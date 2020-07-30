@@ -17,17 +17,22 @@ Usage
 -----
 Create a ``.pymw.toml`` file in your home directory with the following content format to avoid directly providing username and password for login calls:
 
-.. code-block:: toml
+.. code-block:: json
 
-    # The configuration file for pymw python library.
-    version = 1
-
-    ['https://test.wikipedia.org/w/api.php'.login]
-    '<Username@Special:BotPasswords>' = '<BotPassword>'
-
-    # glob patterns are supported
-    ['https://*.wikipedia.org/w/api.php'.login]
-    '<Username>' = '<BotPassword>'
+    {
+        "https://test.wikipedia.org/w/api.php": {
+            "<Username@Special:BotPasswords>": {
+                "BotPassword": "<BotPassword>"
+            },
+            "<AnotherUsername>": {
+                "BotPassword": "<BotPassword2>"
+            }
+        },
+        "https://*.wikipedia.org/w/api.php": {
+            "<Username>": "<BotPassword3>",
+            "limit": 500
+        }
+    }
 
 
 Notable features
