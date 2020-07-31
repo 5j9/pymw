@@ -424,9 +424,7 @@ class API:
         if (limit := self._limit) is None:
             self._limit = limit = get_limit(self._url, self._user)
         values = iter(values)
-        while True:
-            if not (chunk := tuple(islice(values, limit))):
-                return
+        while chunk := (*islice(values, limit),):
             data[param] = chunk
             yield data
 
@@ -442,10 +440,10 @@ class API:
                     json = self.post(data)
                 except TooManyValuesError as e:
                     yield from self._handle_too_many_values_error(e, data)
-                    return  # pragma: nocover
+                    break
                 yield json
                 if (continue_ := json.get('continue')) is None:
-                    return
+                    break
                 if prev_continue is None:
                     data |= (prev_continue := continue_)
                     continue
