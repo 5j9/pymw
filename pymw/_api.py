@@ -385,7 +385,7 @@ class API:
             data['assertuser'] = self._user
         debug('data:\n\t%s\nfiles:\n\t%s', data, files)
         self.last_response = resp = self._post(
-            data, params=params, files=files)
+            params=params, data=data, files=files)
         json = resp.json()
         debug('resp.json:\n\t%s', json)
         if 'warnings' in json:

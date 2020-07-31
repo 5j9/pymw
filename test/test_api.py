@@ -50,16 +50,20 @@ class FakeResp:
         return self._json
 
 
-def patch_post(obj, attr, call_returns, ):
+def patch_post(obj, attr, call_returns, api_post):
     i = -2
 
     def side_effect(*args, **kwargs):
         nonlocal i
         i += 2
         if (expected := call_returns[i]) is not any:
-            assert args == expected.args
-            call_pop = (expected_kwargs := expected.kwargs).pop
             actual_pop = kwargs.pop
+            call_pop = (expected_kwargs := expected.kwargs).pop
+            if api_post == 1:  # API.post
+                assert args == expected.args
+            else:  # session.post
+                assert not args
+                assert expected.args[0] == actual_pop('data')
             assert call_pop('files', None) == actual_pop('files', None)
             assert call_pop('params', None) == actual_pop('params', None)
             assert not kwargs and not expected_kwargs
@@ -69,7 +73,7 @@ def patch_post(obj, attr, call_returns, ):
 
 
 def api_post_patch(*call_returns):
-    return patch_post(API, 'post', call_returns)
+    return patch_post(API, 'post', call_returns, True)
 
 
 def session_post_patch(*call_header_returns):
@@ -87,7 +91,7 @@ def session_post_patch(*call_header_returns):
             response = FakeResp(json=headers_or_json)
             call_responses += (call, response)
             call = json_or_call
-    return patch_post(api, '_post', call_responses)
+    return patch_post(api, '_post', call_responses, False)
 
 
 @api_post_patch(
@@ -354,7 +358,7 @@ def test_login_config():
 def test_assert_login(post_mock):
     api._user = 'USER'
     api.post({})
-    assert post_mock.mock_calls[0].args[0]['assertuser'] == 'USER'
+    assert post_mock.mock_calls[0].kwargs['data']['assertuser'] == 'USER'
 
 
 @session_post_patch(
