@@ -16,10 +16,10 @@ api = API(url)
 TEXT_CONFIG = '''
 {
     "https://www.mediawiki.org/w/api.php": {
-        "username@toolname": {"BotPassword": "bot_password"}
+        "U@T": {"BotPassword": "BP"}
     },
     "https://*.wikipedia.org/w/api.php": {
-        "wp_user": {"BotPassword": "wp_pass"}
+        "U": {"BotPassword": "P"}
     }
 }
 '''
@@ -368,8 +368,8 @@ def test_assert_login(post_mock):
         'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5}),
     {'batchcomplete': True, 'query': {'tokens': {'logintoken': 'T1'}}},
     call({
-        'action': 'login', 'lgname': 'username@toolname', 'lgpassword':
-            'bot_password', 'lgtoken': 'T1', 'format': 'json', 'formatversion':
+        'action': 'login', 'lgname': 'U@T', 'lgpassword':
+            'BP', 'lgtoken': 'T1', 'format': 'json', 'formatversion':
             '2', 'errorformat': 'plaintext', 'maxlag': 5}),
     {'login': {'result': 'Success', 'lguserid': 1, 'lgusername': 'username'}},
     call({
@@ -548,7 +548,8 @@ def test_repr():
 
 def test_glob_pattern_load_lgname_lgpass():
     assert get_lgname_lgpass('https://en.wikipedia.org/w/api.php') \
-           == ('wp_user', 'wp_pass')
+            == get_lgname_lgpass('https://en.wikipedia.org/w/api.php', 'U') \
+            == ('U', 'P')
 
 
 watch_response = {'batchcomplete': True, 'watch': [{'title': '0', 'ns': 0, 'unwatched': True}, {'title': '1', 'ns': 0, 'unwatched': True}]}
@@ -569,8 +570,8 @@ watch_response = {'batchcomplete': True, 'watch': [{'title': '0', 'ns': 0, 'unwa
     }), {'batchcomplete': True, 'query': {'tokens': {
         'logintoken': 'LGT+\\'}}},
     call({
-        'action': 'login', 'lgname': 'username@toolname',
-        'lgpassword': 'bot_password', 'lgtoken': 'LGT+\\',
+        'action': 'login', 'lgname': 'U@T',
+        'lgpassword': 'BP', 'lgtoken': 'LGT+\\',
         'format': 'json', 'formatversion': '2', 'errorformat': 'plaintext',
         'maxlag': 5}),
     {'login': {'result': 'Success', 'lguserid': 1, 'lgusername': 'username'}},
