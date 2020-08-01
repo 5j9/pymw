@@ -6,7 +6,7 @@ with open('README.rst', 'r') as fh:
 
 setup(
     name='pymw',
-    version='0.6.2.dev0',
+    version='0.7.0',
     author='5j9',
     author_email='5j9@users.noreply.github.com',
     description="A thin MediaWiki client using requests.",
