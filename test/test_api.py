@@ -645,3 +645,18 @@ def test_iterable_values_to_str(_):
     api.post({
         'action': 'paraminfo',
         'modules': ('query+info', 'query+categorymembers')})
+
+
+@session_post_patch(
+    call({'type': 'login', 'meta': 'tokens', 'action': 'query', 'format': 'json', 'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5}),
+    {'batchcomplete': True, 'query': {'tokens': {'logintoken': 1}}},
+    call({'action': 'login', 'lgname': 'U@T', 'lgpassword': 'BP', 'lgtoken': 1, 'format': 'json', 'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5}),
+    {'login': {'result': 'Success', 'lguserid': 1, 'lgusername': 'U'}},
+    call({'type': 'csrf', 'meta': 'tokens', 'action': 'query', 'format': 'json', 'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5, 'assertuser': 'U'}),
+    {'batchcomplete': True, 'query': {'tokens': {'csrftoken': 2}}},
+    call({'action': 'undelete', 'title': 'a', 'format': 'json', 'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5, 'token': 2, 'assertuser': 'U'}),
+    (expected_response := {'undelete': {'title': 'A', 'revisions': 1, 'fileversions': 0, 'reason': ''}})
+)
+def test_post_and_continue_with_limited_action_without_limited_param(_, cleared_api):
+    assert (expected_response,) == (
+        *cleared_api.post_and_continue({'action': 'undelete', 'title': 'a'}),)
