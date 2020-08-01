@@ -1,12 +1,13 @@
 from fnmatch import fnmatch
 from functools import lru_cache, partial
-from itertools import islice
+from itertools import islice, chain
 from json import load as json_load
 from logging import warning, debug, info
 from pathlib import Path
 from pprint import pformat
 from time import sleep
-from typing import Any, BinaryIO, Generator, Iterator, Literal, Optional, \
+from typing import Any, BinaryIO, Generator, Iterable, Iterator, Literal, \
+    Optional, \
     Union
 
 from requests import Session, Response
@@ -125,7 +126,7 @@ ACTION_PARAM_TOKEN: dict[str, tuple[Optional[str], Optional[Literal[
 ))
 
 # noinspection PyTypeChecker
-LIMITED_PARAMS = MissingDict(lambda _: None, (
+LIMITED_PARAMS = MissingDict(lambda _: frozenset(), (
     ('streamconfigs', {'streams', 'constraints'}),
     ('clientlogin', {'loginrequests'}),
     ('createaccount', {'createrequests'}),
@@ -408,24 +409,32 @@ class API:
             data[param] = param_values[i:i + limit]
             yield from self.post_and_continue(data)
 
-    def _chunk_limited_param(self, data):
-        if (action_limited := LIMITED_PARAMS[data.get('action')]) is None:
-            yield data
+    def _chunk_value(self, value: Iterable, /):
+        if isinstance(value, str):
+            value = value.split('|')
+        values = iter(value)
+        while chunk := '|'.join(islice(values, self._limit)):
+            yield chunk
+
+    def _chunk_limited_param(self, data: dict, /):
+        if self._limit is None:
+            self._limit = get_limit(self._url, self._user)
+        append_violating = (violating_params := []).append
+        for param in LIMITED_PARAMS[data.get('action')] & data.keys():
+            chunks = self._chunk_value(data[param])
+            if (chunk1 := next(chunks, None)) is None:
+                del data[param]  # empty limited param
+                continue
+            if (chunk2 := next(chunks, None)) is None:
+                data[param] = chunk1  # all data can fit into one chunk
+                continue
+            append_violating(param)
+            # make sure no data is lost from the param value
+            data[param] = chain((chunk1, chunk2), chunks)
+        if len(violating_params) != 1:
+            yield data  # leave it for the API to handle or raise
             return
-        if not (data_limited := action_limited & data.keys()):
-            yield data
-            return
-        if len(data_limited) > 1:
-            yield data  # let the API raise error
-            return
-        # only one limited param was found in data, let's break it into
-        # multiple calls
-        if isinstance(values := data[(param := data_limited.pop())], str):
-            values = values.split('|')
-        if (limit := self._limit) is None:
-            self._limit = limit = get_limit(self._url, self._user)
-        values = iter(values)
-        while chunk := '|'.join(islice(values, limit)):
+        for chunk in self._chunk_value(data[(param := violating_params[0])]):
             data[param] = chunk
             yield data
 

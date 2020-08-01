@@ -655,8 +655,15 @@ def test_iterable_values_to_str(_):
     call({'type': 'csrf', 'meta': 'tokens', 'action': 'query', 'format': 'json', 'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5, 'assertuser': 'U'}),
     {'batchcomplete': True, 'query': {'tokens': {'csrftoken': 2}}},
     call({'action': 'undelete', 'title': 'a', 'format': 'json', 'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5, 'token': 2, 'assertuser': 'U'}),
-    (expected_response := {'undelete': {'title': 'A', 'revisions': 1, 'fileversions': 0, 'reason': ''}})
-)
+    (expected_response := {'undelete': {'title': 'A', 'revisions': 1, 'fileversions': 0, 'reason': ''}}))
 def test_post_and_continue_with_limited_action_without_limited_param(_, cleared_api):
     assert (expected_response,) == (
         *cleared_api.post_and_continue({'action': 'undelete', 'title': 'a'}),)
+
+
+@session_post_patch(
+    call({'action': 'query', 'meta': 'userinfo', 'format': 'json', 'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5}),
+    (ui_response := {'batchcomplete': True, 'query': {'userinfo': {'id': 0, 'name': '31.14.154.1', 'anon': True}}}))
+def test_empty_limited_value(_, cleared_api):
+    for r in cleared_api.post_and_continue({'action': 'query', 'meta': 'userinfo', 'titles': ''}):
+        assert r is ui_response
