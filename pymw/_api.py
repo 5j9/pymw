@@ -237,15 +237,13 @@ class API:
     ) -> dict:
         errors = json['errors']
         for error in errors:
-            if (
-                handler := getattr(
-                    self, f"_handle_{error['code'].replace('-', '_')}_error",
-                    None)
-            ) is not None and (
-                handler_result := handler(resp, data, error)
-            ) is not None:
+            if (handler := getattr(self,
+                f"_handle_{error['code'].replace('-', '_')}_error", None)) \
+                is not None and \
+                    (handler_result := handler(resp, data, error)) is not None:
                 # https://youtrack.jetbrains.com/issue/PY-39262
                 # noinspection PyUnboundLocalVariable
+                # todo: what if there is more than one error?
                 return handler_result
         raise APIError(errors)
 
