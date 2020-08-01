@@ -124,36 +124,37 @@ ACTION_PARAM_TOKEN: dict[str, tuple[Optional[str], Optional[Literal[
     ('visualeditoredit', ('token', 'csrf')),
 ))
 
-LIMITED_PARAMS = {
-    'streamconfigs': {'streams', 'constraints'},
-    'clientlogin': {'loginrequests'},
-    'createaccount': {'createrequests'},
-    'cxsuggestionlist': {'titles'},
-    'echomarkread': {'wikis', 'list', 'unreadlist'},
-    'echomute': {'mute', 'unmute'},
-    'editmassmessagelist': {'add', 'remove'},
-    'globalpreferenceoverrides': {'change'},
-    'globalpreferences': {'change'},
-    'help': {'modules'},
-    'linkaccount': {'linkrequests'},
-    'options': {'change'},
-    'pagetriagetagging': {'taglist'},
-    'paraminfo': {'modules'},
-    'protect': {'protections', 'expiry'},
-    'purge': {'titles', 'pageids', 'revids'},
-    'query': {'titles', 'pageids', 'revids', 'list', 'siifilekey'},
-    'revisiondelete': {'ids'},
-    'setnotificationtimestamp': {'titles', 'pageids', 'revids'},
-    'spamblacklist': {'url'},
-    'tag': {'rcid', 'revid', 'logid', 'remove'},
-    'templatedata': {'titles', 'pageids', 'revids'},
-    'undelete': {'timestamps', 'fileids'},
-    'userrights': {'expiry'},
-    'watch': {'titles', 'pageids', 'revids'},
-    'cxpublish': {'publishtags'},
-    'visualeditor': {'preloadparams'},
-    'visualeditoredit': {'tags'},
-}.get
+# noinspection PyTypeChecker
+LIMITED_PARAMS = MissingDict(lambda _: None, (
+    ('streamconfigs', {'streams', 'constraints'}),
+    ('clientlogin', {'loginrequests'}),
+    ('createaccount', {'createrequests'}),
+    ('cxsuggestionlist', {'titles'}),
+    ('echomarkread', {'wikis', 'list', 'unreadlist'}),
+    ('echomute', {'mute', 'unmute'}),
+    ('editmassmessagelist', {'add', 'remove'}),
+    ('globalpreferenceoverrides', {'change'}),
+    ('globalpreferences', {'change'}),
+    ('help', {'modules'}),
+    ('linkaccount', {'linkrequests'}),
+    ('options', {'change'}),
+    ('pagetriagetagging', {'taglist'}),
+    ('paraminfo', {'modules'}),
+    ('protect', {'protections', 'expiry'}),
+    ('purge', {'titles', 'pageids', 'revids'}),
+    ('query', {'titles', 'pageids', 'revids', 'list', 'siifilekey'}),
+    ('revisiondelete', {'ids'}),
+    ('setnotificationtimestamp', {'titles', 'pageids', 'revids'}),
+    ('spamblacklist', {'url'}),
+    ('tag', {'rcid', 'revid', 'logid', 'remove'}),
+    ('templatedata', {'titles', 'pageids', 'revids'}),
+    ('undelete', {'timestamps', 'fileids'}),
+    ('userrights', {'expiry'}),
+    ('watch', {'titles', 'pageids', 'revids'}),
+    ('cxpublish', {'publishtags'}),
+    ('visualeditor', {'preloadparams'}),
+    ('visualeditoredit', {'tags'}),
+))
 
 
 class PYMWError(RuntimeError):
@@ -408,7 +409,7 @@ class API:
             yield from self.post_and_continue(data)
 
     def _chunk_limited_param(self, data):
-        if (action_limited := LIMITED_PARAMS(data.get('action'))) is None:
+        if (action_limited := LIMITED_PARAMS[data.get('action')]) is None:
             yield data
             return
         if not (data_limited := action_limited & data.keys()) or \
@@ -459,8 +460,6 @@ class API:
 
         https://www.mediawiki.org/wiki/API:Query
         """
-        # todo: titles or pageids is limited to 50 titles per query,
-        #  or 500 for those with the apihighlimits right.
         params['action'] = 'query'
         yield from self.post_and_continue(params)
 
