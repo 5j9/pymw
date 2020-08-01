@@ -130,9 +130,9 @@ def test_unknown_login_result(post_mock):
 
 
 @api_post_patch(
-    call({'list': ('recentchanges',), 'rcprop': 'timestamp', 'rclimit': 1, 'action': 'query'}),
+    call({'list': 'recentchanges', 'rcprop': 'timestamp', 'rclimit': 1, 'action': 'query'}),
     {'batchcomplete': True, 'continue': {'rccontinue': '20190908072938|4484663', 'continue': '-||'}, 'query': {'recentchanges': [{'type': 'log', 'timestamp': '2019-09-08T07:30:00Z'}]}},
-    call({'list': ('recentchanges',), 'rcprop': 'timestamp', 'rclimit': 1, 'action': 'query', 'rccontinue': '20190908072938|4484663', 'continue': '-||'}),
+    call({'list': 'recentchanges', 'rcprop': 'timestamp', 'rclimit': 1, 'action': 'query', 'rccontinue': '20190908072938|4484663', 'continue': '-||'}),
     {'batchcomplete': True, 'query': {'recentchanges': [{'type': 'categorize', 'timestamp': '2019-09-08T07:29:38Z'}]}})
 def test_recentchanges(_):
     assert [rc for rc in api.query_list('recentchanges', rclimit=1, rcprop='timestamp')] == [
@@ -171,14 +171,14 @@ def test_siteinfo(post_mock):
 @api_post_patch(
     call({
         'action': 'query', 'prop': 'langlinks', 'lllimit': 1,
-        'titles': ('Main Page',)}),
+        'titles': 'Main Page'}),
     {'continue': {'llcontinue': '15580374|bg', 'continue': '||'}, 'query': {
         'pages': [{
             'pageid': 15580374, 'ns': 0, 'title': 'Main Page',
             'langlinks': [{'lang': 'ar', 'title': ''}]}]}},
     call({
         'action': 'query', 'prop': 'langlinks', 'lllimit': 1,
-        'titles': ('Main Page',), 'llcontinue': '15580374|bg', 'continue': '||'}),
+        'titles': 'Main Page', 'llcontinue': '15580374|bg', 'continue': '||'}),
     {'batchcomplete': True, 'query': {'pages': [{
         'pageid': 15580374, 'ns': 0, 'title': 'Main Page',
         'langlinks': [{'lang': 'zh', 'title': ''}]}]}})
@@ -190,7 +190,7 @@ def test_langlinks(_):
 
 
 @api_post_patch(
-    call({'action': 'query', 'prop': 'langlinks', 'titles': ('Main Page',)}),
+    call({'action': 'query', 'prop': 'langlinks', 'titles': 'Main Page'}),
     {'batchcomplete': True, 'query': {'pages': [{'pageid': 1182793, 'ns': 0, 'title': 'Main Page'}]}, 'limits': {'langlinks': 500}})
 def test_lang_links_title_not_exists(post_mock):
     titles_langlinks = [page_ll for page_ll in api.query_prop(
@@ -275,7 +275,7 @@ def test_csrf_token(post_mock):
 
 
 @api_post_patch(
-    call({'action': 'query', 'list': ('logevents',), 'lelimit': 1, 'leprop': 'timestamp', 'ledir': 'newer', 'leend': '2004-12-23T18:41:10Z'}),
+    call({'action': 'query', 'list': 'logevents', 'lelimit': 1, 'leprop': 'timestamp', 'ledir': 'newer', 'leend': '2004-12-23T18:41:10Z'}),
     {'batchcomplete': True, 'query': {'logevents': [{'timestamp': '2004-12-23T18:41:10Z'}]}})
 def test_logevents(post_mock):
     events = [e for e in api.query_list('logevents', lelimit=1, leprop='timestamp', ledir='newer', leend='2004-12-23T18:41:10Z')]
@@ -293,7 +293,7 @@ def test_revisions_mode13(_):
 
 
 @api_post_patch(
-    call({'action': 'query', 'prop': 'revisions', 'titles': ('DmazaTest',), 'rvstart': 'now'}),
+    call({'action': 'query', 'prop': 'revisions', 'titles': 'DmazaTest', 'rvstart': 'now'}),
     {'batchcomplete': True, 'query': {'pages': [{'pageid': 112963, 'ns': 0, 'title': 'DmazaTest', 'revisions': [{'revid': 438026, 'parentid': 438023, 'minor': False, 'user': 'DMaza (WMF)', 'timestamp': '2020-06-25T21:09:52Z', 'comment': ''}, {'revid': 438023, 'parentid': 438022, 'minor': False, 'user': 'DMaza (WMF)', 'timestamp': '2020-06-25T21:08:12Z', 'comment': ''}, {'revid': 438022, 'parentid': 0, 'minor': False, 'user': 'DMaza (WMF)', 'timestamp': '2020-06-25T21:08:02Z', 'comment': '1'}]}]}, 'limits': {'revisions': 500}})
 def test_revisions_mode2_no_rvlimit(post_mock):  # auto set rvlimit
     assert [

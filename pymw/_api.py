@@ -412,9 +412,11 @@ class API:
         if (action_limited := LIMITED_PARAMS[data.get('action')]) is None:
             yield data
             return
-        if not (data_limited := action_limited & data.keys()) or \
-                len(data_limited) > 1:  # let the API raise error
+        if not (data_limited := action_limited & data.keys()):
             yield data
+            return
+        if len(data_limited) > 1:
+            yield data  # let the API raise error
             return
         # only one limited param was found in data, let's break it into
         # multiple calls
@@ -423,7 +425,7 @@ class API:
         if (limit := self._limit) is None:
             self._limit = limit = get_limit(self._url, self._user)
         values = iter(values)
-        while chunk := (*islice(values, limit),):
+        while chunk := '|'.join(islice(values, limit)):
             data[param] = chunk
             yield data
 
