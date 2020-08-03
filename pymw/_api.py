@@ -143,7 +143,19 @@ LIMITED_PARAMS = MissingDict(lambda _: frozenset(), (
     ('paraminfo', {'modules'}),
     ('protect', {'protections', 'expiry'}),
     ('purge', {'titles', 'pageids', 'revids'}),
-    ('query', {'titles', 'pageids', 'revids', 'list', 'siifilekey'}),
+    ('query', {
+        'titles', 'pageids', 'revids', 'list',  # general query params
+        # prop params
+        'siifilekey', 'ppprop', 'pltitles', 'siisessionkey', 'tltemplates',
+        'wbeuentities', 'clcategories', 'pcrights', 'gusite', 'imimages',
+        # meta params
+        'ammessages', 'afufeatures', 'licode', 'mgfilter', 'notwikis',
+        'nottitles', 'unpwikis',
+        # list params
+        'thpage', 'thauthor', 'throot', 'thsummary', 'thid', 'ucuser',
+        'ucuserids', 'ususers', 'ususerids', 'wbeuentities', 'edbexts',
+        'rlelists', 'lntpageid', 'crrevs', 'gcnames', 'gacategories', 'gaids',
+        'bgids', 'bgaddresses', 'aflfilter', 'aurights', 'bkids', 'bkusers'}),
     ('revisiondelete', {'ids'}),
     ('setnotificationtimestamp', {'titles', 'pageids', 'revids'}),
     ('spamblacklist', {'url'}),
