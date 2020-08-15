@@ -211,7 +211,7 @@ class TokenManager(dict):
 # noinspection PyShadowingBuiltins
 class API:
     __slots__ = '_url', 'session', 'maxlag', 'tokens', '_user', '_post', \
-        'last_response', '_limit'
+        'last_response', 'limit'
 
     def __enter__(self) -> 'API':
         return self
@@ -234,7 +234,8 @@ class API:
             https://www.mediawiki.org/wiki/API:Etiquette#The_User-Agent_header
             See also: https://meta.wikimedia.org/wiki/User-Agent_policy
         """
-        self._limit = self.last_response = self._user = None
+        self.last_response = self._user = None
+        self.limit = 50
         self.maxlag = maxlag
         s = self.session = Session()
         s.headers['User-Agent'] = \
@@ -327,7 +328,8 @@ class API:
         if result == 'Success':
             self.tokens.clear()
             # lgusername == lgname.partition('@')[0]
-            self._user = login['lgusername']
+            user = self._user = login['lgusername']
+            self.limit = get_limit(self._url, user)
             return login
         if result == 'WrongToken':
             # token is outdated?
@@ -343,7 +345,8 @@ class API:
         """
         self.post({'action': 'logout'})
         self.tokens.clear()
-        self._user = self._limit = None
+        self._user = None
+        self.limit = 50
         # action logout returns empty dict on success, thus no return value
 
     def patrol(self, **params: Any) -> dict:
@@ -416,7 +419,7 @@ class API:
             f"NOTE: sometimes doing this does not make sense.")
         # all iterable values are converted to str in _iterable_values_to_str
         param_values = data[param].split('|')
-        self._limit = limit = e['data']['limit']
+        self.limit = limit = e['data']['limit']
         for i in range(0, len(param_values), limit):
             data[param] = param_values[i:i + limit]
             yield from self.post_and_continue(data)
@@ -425,12 +428,10 @@ class API:
         if isinstance(value, str):
             value = value.split('|')
         values = iter(value)
-        while chunk := '|'.join(islice(values, self._limit)):
+        while chunk := '|'.join(islice(values, self.limit)):
             yield chunk
 
     def _chunk_limited_param(self, data: dict, /):
-        if self._limit is None:
-            self._limit = get_limit(self._url, self._user)
         append_violating = (violating_params := []).append
         for param in LIMITED_PARAMS[data.get('action')] & data.keys():
             chunks = self._chunk_value(data[param])
