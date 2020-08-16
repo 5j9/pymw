@@ -130,10 +130,19 @@ def test_unknown_login_result(post_mock):
 
 
 @api_post_patch(
-    call({'list': 'recentchanges', 'rcprop': 'timestamp', 'rclimit': 1, 'action': 'query'}),
-    {'batchcomplete': True, 'continue': {'rccontinue': '20190908072938|4484663', 'continue': '-||'}, 'query': {'recentchanges': [{'type': 'log', 'timestamp': '2019-09-08T07:30:00Z'}]}},
-    call({'list': 'recentchanges', 'rcprop': 'timestamp', 'rclimit': 1, 'action': 'query', 'rccontinue': '20190908072938|4484663', 'continue': '-||'}),
-    {'batchcomplete': True, 'query': {'recentchanges': [{'type': 'categorize', 'timestamp': '2019-09-08T07:29:38Z'}]}})
+    call({
+        'list': ('recentchanges',), 'rcprop': 'timestamp', 'rclimit': 1,
+        'action': 'query'}),
+    {'batchcomplete': True, 'continue': {
+        'rccontinue': '20190908072938|4484663', 'continue': '-||'
+    }, 'query': {'recentchanges': [{
+        'type': 'log', 'timestamp': '2019-09-08T07:30:00Z'}]}},
+    call({
+        'list': ('recentchanges',), 'rcprop': 'timestamp', 'rclimit': 1,
+        'action': 'query', 'rccontinue': '20190908072938|4484663',
+        'continue': '-||'}),
+    {'batchcomplete': True, 'query': {'recentchanges': [{
+        'type': 'categorize', 'timestamp': '2019-09-08T07:29:38Z'}]}})
 def test_recentchanges(_):
     assert [rc for rc in api.query_list('recentchanges', rclimit=1, rcprop='timestamp')] == [
             {'type': 'log', 'timestamp': '2019-09-08T07:30:00Z'},
@@ -171,14 +180,15 @@ def test_siteinfo(post_mock):
 @api_post_patch(
     call({
         'action': 'query', 'prop': 'langlinks', 'lllimit': 1,
-        'titles': 'Main Page'}),
+        'titles': ('Main Page',)}),
     {'continue': {'llcontinue': '15580374|bg', 'continue': '||'}, 'query': {
         'pages': [{
             'pageid': 15580374, 'ns': 0, 'title': 'Main Page',
             'langlinks': [{'lang': 'ar', 'title': ''}]}]}},
     call({
         'action': 'query', 'prop': 'langlinks', 'lllimit': 1,
-        'titles': 'Main Page', 'llcontinue': '15580374|bg', 'continue': '||'}),
+        'titles': ('Main Page',),
+        'llcontinue': '15580374|bg', 'continue': '||'}),
     {'batchcomplete': True, 'query': {'pages': [{
         'pageid': 15580374, 'ns': 0, 'title': 'Main Page',
         'langlinks': [{'lang': 'zh', 'title': ''}]}]}})
@@ -190,7 +200,7 @@ def test_langlinks(_):
 
 
 @api_post_patch(
-    call({'action': 'query', 'prop': 'langlinks', 'titles': 'Main Page'}),
+    call({'action': 'query', 'prop': 'langlinks', 'titles': ('Main Page',)}),
     {'batchcomplete': True, 'query': {'pages': [{'pageid': 1182793, 'ns': 0, 'title': 'Main Page'}]}, 'limits': {'langlinks': 500}})
 def test_lang_links_title_not_exists(post_mock):
     titles_langlinks = [page_ll for page_ll in api.query_prop(
@@ -275,7 +285,10 @@ def test_csrf_token(post_mock):
 
 
 @api_post_patch(
-    call({'action': 'query', 'list': 'logevents', 'lelimit': 1, 'leprop': 'timestamp', 'ledir': 'newer', 'leend': '2004-12-23T18:41:10Z'}),
+    call({
+        'action': 'query', 'list': ('logevents',), 'lelimit': 1,
+        'leprop': 'timestamp', 'ledir': 'newer',
+        'leend': '2004-12-23T18:41:10Z'}),
     {'batchcomplete': True, 'query': {'logevents': [{'timestamp': '2004-12-23T18:41:10Z'}]}})
 def test_logevents(post_mock):
     events = [e for e in api.query_list('logevents', lelimit=1, leprop='timestamp', ledir='newer', leend='2004-12-23T18:41:10Z')]
@@ -293,8 +306,20 @@ def test_revisions_mode13(_):
 
 
 @api_post_patch(
-    call({'action': 'query', 'prop': 'revisions', 'titles': 'DmazaTest', 'rvstart': 'now'}),
-    {'batchcomplete': True, 'query': {'pages': [{'pageid': 112963, 'ns': 0, 'title': 'DmazaTest', 'revisions': [{'revid': 438026, 'parentid': 438023, 'minor': False, 'user': 'DMaza (WMF)', 'timestamp': '2020-06-25T21:09:52Z', 'comment': ''}, {'revid': 438023, 'parentid': 438022, 'minor': False, 'user': 'DMaza (WMF)', 'timestamp': '2020-06-25T21:08:12Z', 'comment': ''}, {'revid': 438022, 'parentid': 0, 'minor': False, 'user': 'DMaza (WMF)', 'timestamp': '2020-06-25T21:08:02Z', 'comment': '1'}]}]}, 'limits': {'revisions': 500}})
+    call({
+        'action': 'query', 'prop': 'revisions', 'titles': ('DmazaTest',),
+        'rvstart': 'now'}),
+    {'batchcomplete': True, 'query': {'pages': [{
+        'pageid': 112963, 'ns': 0, 'title': 'DmazaTest', 'revisions': [{
+            'revid': 438026, 'parentid': 438023, 'minor': False,
+            'user': 'DMaza (WMF)', 'timestamp': '2020-06-25T21:09:52Z',
+            'comment': ''
+        }, {
+            'revid': 438023, 'parentid': 438022, 'minor': False,
+            'user': 'DMaza (WMF)', 'timestamp': '2020-06-25T21:08:12Z',
+            'comment': ''}, {'revid': 438022, 'parentid': 0, 'minor': False,
+            'user': 'DMaza (WMF)', 'timestamp': '2020-06-25T21:08:02Z',
+            'comment': '1'}]}]}, 'limits': {'revisions': 500}})
 def test_revisions_mode2_no_rvlimit(post_mock):  # auto set rvlimit
     assert [
         {'ns': 0, 'pageid': 112963, 'revisions': [{'comment': '', 'minor': False, 'parentid': 438023, 'revid': 438026, 'timestamp': '2020-06-25T21:09:52Z', 'user': 'DMaza (WMF)'}, {'comment': '', 'minor': False, 'parentid': 438022, 'revid': 438023, 'timestamp': '2020-06-25T21:08:12Z', 'user': 'DMaza (WMF)'}, {'comment': '1', 'minor': False, 'parentid': 0, 'revid': 438022, 'timestamp': '2020-06-25T21:08:02Z', 'user': 'DMaza (WMF)'}], 'title': 'DmazaTest'}
@@ -662,8 +687,32 @@ def test_post_and_continue_with_limited_action_without_limited_param(_, cleared_
 
 
 @session_post_patch(
-    call({'action': 'query', 'meta': 'userinfo', 'format': 'json', 'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5}),
-    (ui_response := {'batchcomplete': True, 'query': {'userinfo': {'id': 0, 'name': '31.14.154.1', 'anon': True}}}))
+    call({
+        'action': 'query', 'meta': 'userinfo', 'format': 'json',
+        'formatversion': '2', 'errorformat': 'plaintext', 'maxlag': 5}),
+    (ui_response := {'batchcomplete': True, 'query': {'userinfo': {
+        'id': 0, 'name': '1.2.3.4', 'anon': True}}}))
 def test_empty_limited_value(_, cleared_api):
-    for r in cleared_api.post_and_continue({'action': 'query', 'meta': 'userinfo', 'titles': ''}):
+    for r in cleared_api.post_and_continue({
+            'action': 'query', 'meta': 'userinfo', 'titles': ''}):
         assert r is ui_response
+
+
+@api_post_patch(
+    call({'action': 'query', 'titles': ('0', '1')}), {},
+    call({'action': 'query', 'titles': ('2', '3')}), {},
+    call({'action': 'query', 'titles': ('4',)}), {},
+)
+def test_iterable_limited_value(_, cleared_api):
+    cleared_api.limit = 2
+    for _ in cleared_api.post_and_continue({
+            'action': 'query', 'titles': (f'{t}' for t in range(5))}):
+        pass
+
+
+@api_post_patch(
+    call({'action': 'query'}), {'batchcomplete': True})
+def test_none_value_chunk(_, cleared_api):
+    for _ in cleared_api.post_and_continue({
+            'action': 'query', 'titles': None}):
+        pass

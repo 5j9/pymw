@@ -425,10 +425,12 @@ class API:
             yield from self.post_and_continue(data)
 
     def _chunk_value(self, value: Iterable, /):
+        if not value:  # e.g. None or ''
+            return
         if isinstance(value, str):
             value = value.split('|')
         values = iter(value)
-        while chunk := '|'.join(islice(values, self.limit)):
+        while chunk := (*islice(values, self.limit),):
             yield chunk
 
     def _chunk_limited_param(self, data: dict, /):
@@ -443,7 +445,7 @@ class API:
                 continue
             append_violating(param)
             # make sure no data is lost from the param value
-            data[param] = chain((chunk1, chunk2), chunks)
+            data[param] = chain(chunk1, chunk2, chain.from_iterable(chunks))
         if len(violating_params) != 1:
             yield data  # leave it for the API to handle or raise
             return
