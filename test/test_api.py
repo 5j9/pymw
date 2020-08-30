@@ -5,6 +5,7 @@ from unittest.mock import call, patch, mock_open
 
 from pytest import fixture, raises
 
+# noinspection PyProtectedMember
 from pymw import API, LoginError, APIError, _api
 # noinspection PyProtectedMember
 from pymw._api import get_lgname_lgpass, load_config
@@ -144,7 +145,8 @@ def test_unknown_login_result(post_mock):
     {'batchcomplete': True, 'query': {'recentchanges': [{
         'type': 'categorize', 'timestamp': '2019-09-08T07:29:38Z'}]}})
 def test_recentchanges(_):
-    assert [rc for rc in api.query_list('recentchanges', rclimit=1, rcprop='timestamp')] == [
+    assert [rc for rc in api.list(
+        'recentchanges', {'rclimit': 1, 'rcprop': 'timestamp'})] == [
             {'type': 'log', 'timestamp': '2019-09-08T07:30:00Z'},
             {'type': 'categorize', 'timestamp': '2019-09-08T07:29:38Z'}]
 
@@ -163,7 +165,7 @@ def test_recentchanges(_):
     }),
     {}, {'batchcomplete': True, 'query': {'tokens': {'watchtoken': '+\\'}}})
 def test_maxlag(_, warning_mock, cleared_api):
-    tokens = cleared_api.query_meta('tokens', type='watch')
+    tokens = cleared_api.meta('tokens', {'type': 'watch'})
     assert tokens == {'watchtoken': '+\\'}
     warning_mock.assert_called_with('maxlag error (retrying after 5 seconds)')
 
@@ -172,7 +174,7 @@ def test_maxlag(_, warning_mock, cleared_api):
     call({'action': 'query', 'meta': 'siteinfo', 'siprop': 'protocols'}),
     {'batchcomplete': True, 'query': {'protocols': ['http://', 'https://']}})
 def test_siteinfo(post_mock):
-    si = api.query_meta('siteinfo', siprop='protocols')
+    si = api.meta('siteinfo', {'siprop': 'protocols'})
     assert si == {'protocols': ['http://', 'https://']}
     post_mock.assert_called_once()
 
@@ -193,8 +195,8 @@ def test_siteinfo(post_mock):
         'pageid': 15580374, 'ns': 0, 'title': 'Main Page',
         'langlinks': [{'lang': 'zh', 'title': ''}]}]}})
 def test_langlinks(_):
-    titles_langlinks = [page_ll for page_ll in api.query_prop(
-        'langlinks', titles='Main Page', lllimit=1)]
+    titles_langlinks = [page_ll for page_ll in api.prop(
+        'langlinks', {'titles': 'Main Page', 'lllimit': 1})]
     assert len(titles_langlinks) == 1
     assert titles_langlinks[0] == {'pageid': 15580374, 'ns': 0, 'title': 'Main Page', 'langlinks': [{'lang': 'ar', 'title': ''}, {'lang': 'zh', 'title': ''}]}
 
@@ -203,8 +205,8 @@ def test_langlinks(_):
     call({'action': 'query', 'prop': 'langlinks', 'titles': ('Main Page',)}),
     {'batchcomplete': True, 'query': {'pages': [{'pageid': 1182793, 'ns': 0, 'title': 'Main Page'}]}, 'limits': {'langlinks': 500}})
 def test_lang_links_title_not_exists(post_mock):
-    titles_langlinks = [page_ll for page_ll in api.query_prop(
-        'langlinks', titles='Main Page')]
+    titles_langlinks = [page_ll for page_ll in api.prop(
+        'langlinks', {'titles': 'Main Page'})]
     assert len(titles_langlinks) == 1
     post_mock.assert_called_once()
     assert titles_langlinks[0] == {'pageid': 1182793, 'ns': 0, 'title': 'Main Page'}
@@ -214,7 +216,7 @@ def test_lang_links_title_not_exists(post_mock):
     call({'action': 'query', 'meta': 'userinfo'}),
     {'batchcomplete': True, 'query': {'userinfo': {'id': 0, 'name': '1.1.1.1', 'anon': True}}})
 def test_userinfo(post_mock):
-    assert api.query_meta('userinfo') == {'id': 0, 'name': '1.1.1.1', 'anon': True}
+    assert api.meta('userinfo', {}) == {'id': 0, 'name': '1.1.1.1', 'anon': True}
     post_mock.assert_called_once()
 
 
@@ -222,7 +224,7 @@ def test_userinfo(post_mock):
     call({'action': 'query', 'meta': 'filerepoinfo', 'friprop': 'displayname'}),
     {'batchcomplete': True, 'query': {'repos': [{'displayname': 'Commons'}, {'displayname': 'Wikipedia'}]}})
 def test_filerepoinfo(post_mock):
-    assert api.query_meta('filerepoinfo', friprop='displayname') ==\
+    assert api.meta('filerepoinfo', {'friprop': 'displayname'}) == \
            [{'displayname': 'Commons'}, {'displayname': 'Wikipedia'}]
     post_mock.assert_called_once()
 
@@ -235,7 +237,8 @@ def test_context_manager():
     close_mock.assert_called_once_with()
 
 
-@session_post_patch(any, {}, {'errors': [{'code': 'badtoken', 'text': 'Invalid CSRF token.', 'module': 'patrol'}], 'docref': ..., 'servedby': 'mw1279'})
+@session_post_patch(
+    any, {}, {'errors': [{'code': 'badtoken', 'text': 'Invalid CSRF token.', 'module': 'patrol'}], 'docref': ..., 'servedby': 'mw1279'})
 def test_bad_patrol_token(_):
     api._user = 'x'
     api.tokens['patrol'] = 'T'
@@ -246,9 +249,9 @@ def test_bad_patrol_token(_):
     else:  # pragma: nocover
         raise AssertionError('APIError was not raised')
     with patch.object(
-            API, 'query_meta', return_value={'patroltoken': 'N'}) as m:
+            API, 'meta', return_value={'patroltoken': 'N'}) as m:
         assert api.tokens['patrol'] == 'N'
-    m.assert_called_once_with('tokens', type='patrol')
+    m.assert_called_once_with('tokens', {'type': 'patrol'})
 
 
 def test_rawcontinue():
@@ -291,7 +294,9 @@ def test_csrf_token(post_mock):
         'leend': '2004-12-23T18:41:10Z'}),
     {'batchcomplete': True, 'query': {'logevents': [{'timestamp': '2004-12-23T18:41:10Z'}]}})
 def test_logevents(post_mock):
-    events = [e for e in api.query_list('logevents', lelimit=1, leprop='timestamp', ledir='newer', leend='2004-12-23T18:41:10Z')]
+    events = [e for e in api.list('logevents', {
+        'lelimit': 1, 'leprop': 'timestamp', 'ledir': 'newer',
+        'leend': '2004-12-23T18:41:10Z'})]
     assert len(events) == 1
     assert events[0] == {'timestamp': '2004-12-23T18:41:10Z'}
     post_mock.assert_called_once()
@@ -302,7 +307,7 @@ def test_revisions_mode13(_):
     assert [
         {'pageid': 91945, 'ns': 0, 'title': 'A', 'revisions': [{'revid': 28594859, 'parentid': 28594843, 'minor': False, 'user': '5.119.128.223', 'anon': True, 'timestamp': '2020-03-31T11:38:15Z', 'comment': 'c1'}]},
         {'pageid': 91946, 'ns': 0, 'title': 'B', 'revisions': [{'revid': 28199506, 'parentid': 25110220, 'minor': False, 'user': '2.147.31.47', 'anon': True, 'timestamp': '2020-02-08T14:53:12Z', 'comment': 'c2'}]}
-    ] == [r for r in api.query_prop('revisions', titles='a|b')]
+    ] == [r for r in api.prop('revisions', {'titles': 'a|b'})]
 
 
 @api_post_patch(
@@ -317,13 +322,15 @@ def test_revisions_mode13(_):
         }, {
             'revid': 438023, 'parentid': 438022, 'minor': False,
             'user': 'DMaza (WMF)', 'timestamp': '2020-06-25T21:08:12Z',
-            'comment': ''}, {'revid': 438022, 'parentid': 0, 'minor': False,
+            'comment': ''}, {
+            'revid': 438022, 'parentid': 0, 'minor': False,
             'user': 'DMaza (WMF)', 'timestamp': '2020-06-25T21:08:02Z',
             'comment': '1'}]}]}, 'limits': {'revisions': 500}})
 def test_revisions_mode2_no_rvlimit(post_mock):  # auto set rvlimit
     assert [
         {'ns': 0, 'pageid': 112963, 'revisions': [{'comment': '', 'minor': False, 'parentid': 438023, 'revid': 438026, 'timestamp': '2020-06-25T21:09:52Z', 'user': 'DMaza (WMF)'}, {'comment': '', 'minor': False, 'parentid': 438022, 'revid': 438023, 'timestamp': '2020-06-25T21:08:12Z', 'user': 'DMaza (WMF)'}, {'comment': '1', 'minor': False, 'parentid': 0, 'revid': 438022, 'timestamp': '2020-06-25T21:08:02Z', 'user': 'DMaza (WMF)'}], 'title': 'DmazaTest'}
-    ] == [r for r in api.query_prop('revisions', titles='DmazaTest', rvstart='now')]
+    ] == [r for r in api.prop(
+        'revisions', {'titles': 'DmazaTest', 'rvstart': 'now'})]
     post_mock.assert_called_once()
 
 
@@ -374,7 +381,7 @@ def test_upload_chunks(_):
 @patch('pymw._api.Path.open', json_open_mock)
 @patch.object(_api, 'CONFIG', None)
 def test_login_config():
-    _api.load_config()
+    load_config()
     assert _api.CONFIG == CONFIG
     json_open_mock.assert_called_once()
 
@@ -409,7 +416,7 @@ def test_assert_login(post_mock):
 )
 def test_handle_login_required(_, cleared_api):
     assert cleared_api.user is None
-    r = cleared_api.query_meta('notifications', notfilter='!read')
+    r = cleared_api.meta('notifications', {'notfilter': '!read'})
     assert r == {'list': [], 'continue': None}
     assert cleared_api.user == 'username'
 
@@ -425,7 +432,7 @@ def test_handle_login_required(_, cleared_api):
                 'content': ...}}}]}]}})
 def test_empty_pages_in_prop_query(_):
     # should not raise KeyError: 'query'
-    next(api.query_prop('revisions'))
+    next(api.prop('revisions', {}))
 
 
 page = {
@@ -448,7 +455,7 @@ page = {
             'ns': 0, 'pageid': 8988, 'title': 'E (عدد)'}]}})
 def test_prop_complete_first(_):
     # used to give KeyError: 'revisions'
-    assert next(api.query_prop('revisions')) is page
+    assert next(api.prop('revisions', {})) is page
 
 
 @api_post_patch(
@@ -467,7 +474,7 @@ def test_prop_complete_first(_):
         'query': {'pages': [page]}})
 def test_prop_incomplete_first(_):
     # used to give KeyError: 'revisions'
-    assert next(api.query_prop('revisions')) == page
+    assert next(api.prop('revisions', {})) == page
 
 
 c2 = {'continue': 'gapcontinue||', 'gapcontinue': 'ISO3166-2:AD'}
@@ -510,7 +517,7 @@ page2 = {
             'continue': 'gapcontinue||', 'gapcontinue': 'آئودی_لو_مان_کواترو'},
         'limits': {'allpages': 5000}, 'query': {'pages': [incomplete_page2]}})
 def test_complete_in_the_middle_of_batch(_):
-    assert next(api.query_prop('revisions')) == page2
+    assert next(api.prop('revisions', {})) == page2
 
 
 page3 = {'ns': 0, 'pageid': 1844356, 'revisions': [{
@@ -531,7 +538,7 @@ page3 = {'ns': 0, 'pageid': 1844356, 'revisions': [{
             'continue': 'gapcontinue||', 'gapcontinue': 'ISO3166-2:AD'},
         'query': {'pages': [page3, incomplete_page2]}})
 def test_page_in_last_batch(_):
-    page = next(api.query_prop('revisions'))
+    page = next(api.prop('revisions', {}))
     assert page is page3
 
 
@@ -553,8 +560,8 @@ def test_page_in_last_batch(_):
         {'pageid': 288753, 'ns': 0, 'title': 'شیران', 'langlinks': [
             {'lang': 'zh-min-nan', 'title': 'Shiran (Ardabil)'}]}]}})
 def test_batch_prop_extend(_):
-    assert next(api.query_prop(
-        'langlinks', llprop='', lllimit=2, titles='شیران')
+    assert next(api.prop(
+        'langlinks', {'llprop': '', 'lllimit': 2, 'titles': 'شیران'})
     ) == {
         'pageid': 288753, 'ns': 0, 'title': 'شیران', 'langlinks': [
             {'lang': 'ar', 'title': 'شيران'},

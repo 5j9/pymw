@@ -5,7 +5,7 @@
 .. image:: https://codecov.io/gh/5j9/pymw/branch/master/graph/badge.svg
   :target: https://codecov.io/gh/5j9/pymw
 
-Another personal pet project of mine. It requires Python 3.9+!
+Yet another MediaWiki client library for Python. It's not stable yet and it requires Python 3.9+!
 
 Installation
 ------------
@@ -43,7 +43,7 @@ Notable features
 - Has a ``post_and_continue`` method that can handle `continuations`_.
 - Parameter values can be ``str`` or any Python iterable. Iterable values that are not an ``str`` instance will be converted to a pipe-joined ``str`` before being sent.
 - The ``post_and_continue`` method automatically breaks a value that has too many items in it into several API calls according the API limit for the current user and yields the results. (Currently this feature works only if there is just one violating parameter. The algorithm might be improved in the future to handle more complex situations.)
-- ``query_prop`` method handles batchcomplete_ signals for prop queries and yields the results as soon as a batch is complete.
+- ``prop`` method handles batchcomplete_ signals for prop queries and yields the results as soon as a batch is complete.
 - Configurable maxlag_. Waits as the  API recommends and then retries.
 - Automatically tries to login before performing actions that are known to require login.
 - Automatically tries to login if an API call returns ``login-required`` error (requires username and password to be set in ``~/.pymw.json``).

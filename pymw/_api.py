@@ -203,8 +203,8 @@ class TokenManager(dict):
         super().__init__()
 
     def __missing__(self, token_type) -> str:
-        v = self[token_type] = self.api.query_meta(
-            'tokens', type=token_type)[f'{token_type}token']
+        v = self[token_type] = self.api.meta(
+            'tokens', {'type': token_type})[f'{token_type}token']
         return v
 
 
@@ -489,9 +489,7 @@ class API:
         params['action'] = 'query'
         yield from self.post_and_continue(params)
 
-    def query_list(
-        self, list: str, **params: Any
-    ) -> Generator[dict, None, None]:
+    def list(self, list: str, params: dict) -> Generator[dict, None, None]:
         """Post a list query and yield the results.
 
         https://www.mediawiki.org/wiki/API:Lists
@@ -502,7 +500,7 @@ class API:
             for item in json['query'][list]:
                 yield item
 
-    def query_meta(self, meta, **params: Any) -> dict:
+    def meta(self, meta, params: dict) -> dict:
         """Post a meta query and return the result .
 
         Note: Some meta queries require special handling. Use `self.query()`
@@ -522,9 +520,7 @@ class API:
             assert 'continue' not in json
             return json['query'][meta]
 
-    def query_prop(
-        self, prop: str, **params: Any
-    ) -> Generator[dict, None, None]:
+    def prop(self, prop: str, params: dict) -> Generator[dict, None, None]:
         """Post a prop query, handle batchcomplete, and yield the results.
 
         https://www.mediawiki.org/wiki/API:Properties
