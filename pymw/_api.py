@@ -12,7 +12,7 @@ from typing import Any, BinaryIO, Generator, Iterable, Iterator, Literal, \
 
 from requests import Session, Response
 
-__version__ = '0.9.1.dev0'
+__version__ = '0.9.1'
 
 
 CONFIG: Optional[dict] = None
