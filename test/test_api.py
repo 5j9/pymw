@@ -20,7 +20,10 @@ TEXT_CONFIG = '''
         "U@T": {"BotPassword": "BP"}
     },
     "https://*.wikipedia.org/w/api.php": {
-        "U": {"BotPassword": "P"}
+        "U": {"BotPassword": "P", "limit": 50}
+    },
+    "https://test.wikipedia.org/w/api.php": {
+        "TestUser": {"BotPassword": "TestPass", "limit": 500}
     }
 }
 '''
@@ -717,9 +720,18 @@ def test_iterable_limited_value(_, cleared_api):
         pass
 
 
-@api_post_patch(
-    call({'action': 'query'}), {'batchcomplete': True})
+@api_post_patch(call({'action': 'query'}), {'batchcomplete': True})
 def test_none_value_chunk(_, cleared_api):
     for _ in cleared_api.post_and_continue({
             'action': 'query', 'titles': None}):
         pass
+
+
+@api_post_patch(any, {'login': {'result': 'Success', 'lguserid': 1, 'lgusername': 'TestUser'}})
+def test_config_limit(_):
+    test_api = API('https://test.wikipedia.org/w/api.php')
+    assert test_api.limit == 50
+    test_api.tokens['login'] = 'T'
+    test_api.login()
+    assert test_api.user == 'TestUser'
+    assert test_api.limit == 500

@@ -642,6 +642,6 @@ def get_lgname_lgpass(api_url, username=None) -> tuple[str, str]:
 
 def get_limit(api_url, username):
     try:
-        get_config(api_url)[username]['limit']
+        return get_config(api_url)[username]['limit']
     except KeyError:
         return 50
