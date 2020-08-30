@@ -243,7 +243,7 @@ def test_bad_patrol_token(_):
     api._user = 'x'
     api.tokens['patrol'] = 'T'
     try:
-        api.patrol(revid=1)
+        api.post({'action': 'patrol', 'revid': 1})
     except APIError:
         pass
     else:  # pragma: nocover

@@ -349,16 +349,6 @@ class API:
         self.limit = 50
         # action logout returns empty dict on success, thus no return value
 
-    def patrol(self, **params: Any) -> dict:
-        """Patrol a page or revision.
-
-        `token` will be added automatically.
-
-        https://www.mediawiki.org/wiki/API:Patrol
-        """
-        params |= {'action': 'patrol'}
-        return self.post(params)
-
     def _prepare_action(self, /, data: dict):
         if (action := data.get('action')) is None:
             return
